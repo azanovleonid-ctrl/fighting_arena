@@ -13,7 +13,6 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
-import retrofit2.http.Path
 import retrofit2.http.Query
 import java.io.IOException
 
@@ -25,10 +24,7 @@ interface ArenaApi {
     @PATCH("me/settings") suspend fun updateSettings(@Body body: Settings): Settings
     @POST("me/stats") suspend fun spendPoints(@Body body: StatPoints): Profile
 
-    @POST("fights") suspend fun startFight(): Fight
-    @GET("fights/{id}") suspend fun fight(@Path("id") id: String): Fight
-    @POST("fights/{id}/turn") suspend fun turn(@Path("id") id: String, @Body move: Move): Fight
-    @GET("fights") suspend fun history(@Query("before") before: String? = null, @Query("limit") limit: Int = 20): FightPage
+    @GET("matches") suspend fun history(@Query("before") before: String? = null, @Query("limit") limit: Int = 20): MatchPage
 }
 
 val json = Json {

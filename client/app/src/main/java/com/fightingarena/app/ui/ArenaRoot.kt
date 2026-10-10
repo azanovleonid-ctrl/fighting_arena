@@ -52,11 +52,8 @@ private fun MainNav(app: ArenaApp) {
                 onSettings = { nav.navigate("settings") },
             )
         }
-        composable("fight") { FightScreen(app, fightId = null, onExit = { nav.popBackStack() }) }
-        composable("history") { HistoryScreen(app, onOpen = { nav.navigate("fight/$it") }, onBack = { nav.popBackStack() }) }
-        composable("fight/{id}") { entry ->
-            FightScreen(app, fightId = entry.arguments?.getString("id"), onExit = { nav.popBackStack() })
-        }
+        composable("fight") { GameScreen(app, onExit = { nav.popBackStack() }) }
+        composable("history") { HistoryScreen(app, onBack = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(app, onBack = { nav.popBackStack() }) }
     }
 }

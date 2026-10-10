@@ -1,6 +1,5 @@
 package com.fightingarena.app.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,13 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.fightingarena.app.ArenaApp
-import com.fightingarena.app.data.FightSummary
-import com.fightingarena.app.data.resultTitle
+import com.fightingarena.app.data.MatchSummary
 import kotlinx.coroutines.launch
 
 @Composable
-fun HistoryScreen(app: ArenaApp, onOpen: (String) -> Unit, onBack: () -> Unit) {
-    var items by remember { mutableStateOf(listOf<FightSummary>()) }
+fun HistoryScreen(app: ArenaApp, onBack: () -> Unit) {
+    var items by remember { mutableStateOf(listOf<MatchSummary>()) }
     var next by remember { mutableStateOf<String?>(null) }
     var loaded by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -54,9 +52,10 @@ fun HistoryScreen(app: ArenaApp, onOpen: (String) -> Unit, onBack: () -> Unit) {
                 else -> LazyColumn {
                     items(items, key = { it.id }) { f ->
                         ListItem(
-                            headlineContent = { Text("${resultTitle(f.result)} · ${f.opponent}") },
-                            supportingContent = { Text("Раундов: ${f.rounds} · опыт +${f.xpGained}") },
-                            modifier = Modifier.clickable { onOpen(f.id) },
+                            headlineContent = { Text(if (f.place == 1) "Победа" else "Место ${f.place} из ${f.players}") },
+                            supportingContent = {
+                                Text("Убийства ${f.kills} · смерти ${f.deaths} · урон ${f.damage} · опыт +${f.xpGained}")
+                            },
                         )
                         HorizontalDivider()
                     }

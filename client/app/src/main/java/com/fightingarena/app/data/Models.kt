@@ -1,6 +1,5 @@
 package com.fightingarena.app.data
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // Mirrors the server's JSON (see server/src). Unknown fields are ignored by the decoder.
@@ -48,65 +47,20 @@ data class Profile(
 )
 
 @Serializable
-enum class Zone(val title: String) {
-    @SerialName("head") HEAD("Голова"),
-    @SerialName("chest") CHEST("Грудь"),
-    @SerialName("belly") BELLY("Живот"),
-    @SerialName("waist") WAIST("Пояс"),
-    @SerialName("legs") LEGS("Ноги"),
-}
-
-@Serializable
-data class Move(val attack: Zone, val blocks: List<Zone>)
-
-@Serializable
-data class Strike(val attacker: String, val zone: Zone, val outcome: String, val damage: Int)
-
-@Serializable
-data class Round(
-    val number: Int,
-    val playerMove: Move,
-    val opponentMove: Move,
-    val strikes: List<Strike>,
-    val playerHp: Int,
-    val opponentHp: Int,
+data class MatchSummary(
+    val id: String,
+    val place: Int,
+    val players: Int,
+    val kills: Int,
+    val deaths: Int,
+    val damage: Int,
+    val result: String,
+    val xpGained: Int,
 )
 
 @Serializable
-data class FighterView(val name: String, val hp: Int, val maxHp: Int, val stats: Stats)
-
-@Serializable
-data class Fight(
-    val id: String,
-    val status: String,
-    val result: String? = null,
-    val player: FighterView,
-    val opponent: FighterView,
-    val rounds: List<Round>,
-    val xpGained: Int,
-) {
-    val isActive get() = status == "active"
-}
-
-@Serializable
-data class FightSummary(
-    val id: String,
-    val opponent: String,
-    val result: String? = null,
-    val rounds: Int,
-    val xpGained: Int,
-    val finishedAt: String? = null,
-)
-
-@Serializable
-data class FightPage(val items: List<FightSummary>, val nextBefore: String? = null)
+data class MatchPage(val items: List<MatchSummary>, val nextBefore: String? = null)
 
 @Serializable
 data class ApiError(val error: String, val message: String)
 
-fun resultTitle(result: String?) = when (result) {
-    "win" -> "Победа"
-    "loss" -> "Поражение"
-    "draw" -> "Ничья"
-    else -> "Бой идёт"
-}
