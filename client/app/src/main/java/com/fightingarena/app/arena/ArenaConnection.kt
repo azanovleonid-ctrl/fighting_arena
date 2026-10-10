@@ -99,6 +99,10 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
     /** Round trip to the server in ms, measured with ping messages; null until the first answer. */
     @Volatile var pingMs: Int? = null
         private set
+    /** Best of the last 10 pings: the network's own delay without spikes. */
+    @Volatile var pingMinMs: Int? = null
+        private set
+    private val recentPings = ArrayDeque<Int>()
     private var lastPingNanos = 0L
 
     /** Sends a ping about once a second (called from the frame loop). */
@@ -129,7 +133,13 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
                 "start" -> _phase.value = Phase.Playing(json.decodeFromJsonElement(StartMsg.serializer(), obj))
                 "state" -> receive(json.decodeFromJsonElement(StateMsg.serializer(), obj))
                 "pong" -> obj["c"]?.jsonPrimitive?.content?.toLongOrNull()?.let {
-                    pingMs = ((System.nanoTime() - it) / 1_000_000L).toInt()
+                    val ms = ((System.nanoTime() - it) / 1_000_000L).toInt()
+                    pingMs = ms
+                    synchronized(recentPings) {
+                        recentPings.addLast(ms)
+                        if (recentPings.size > 10) recentPings.removeFirst()
+                        pingMinMs = recentPings.min()
+                    }
                 }
                 "end" -> _phase.value = Phase.Ended(json.decodeFromJsonElement(EndMsg.serializer(), obj))
             }

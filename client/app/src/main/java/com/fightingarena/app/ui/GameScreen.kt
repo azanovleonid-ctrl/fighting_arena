@@ -131,7 +131,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
             .pointerInput(conn) { handleTouches(controls, conn) },
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawArena(conn, start, controls, paints, predictor.pos, local, "${fps[0].toInt()} к/с · пинг ${conn.pingMs?.let { "$it мс" } ?: "—"}", frame)
+            drawArena(conn, start, controls, paints, predictor.pos, local, "${fps[0].toInt()} к/с · пинг ${conn.pingMs?.let { "$it мс (лучший ${conn.pingMinMs})" } ?: "—"}", frame)
         }
     }
 }
