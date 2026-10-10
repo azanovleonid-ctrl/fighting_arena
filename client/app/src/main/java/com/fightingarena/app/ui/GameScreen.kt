@@ -41,11 +41,13 @@ import com.fightingarena.app.arena.ArenaConnection
 import com.fightingarena.app.arena.EndMsg
 import com.fightingarena.app.arena.Phase
 import com.fightingarena.app.arena.StartMsg
+import com.fightingarena.app.data.brawler
+import com.fightingarena.app.data.modeName
 
 @Composable
 fun GameScreen(app: ArenaApp, mode: String, onExit: () -> Unit) {
-    val weapon = app.session.profile.value?.settings?.weapon ?: "rifle"
-    val conn = remember { ArenaConnection(app.session.token.orEmpty(), mode, weapon) }
+    val brawler = app.session.profile.value?.settings?.brawler ?: "spark"
+    val conn = remember { ArenaConnection(app.session.token.orEmpty(), mode, brawler) }
     DisposableEffect(conn) { onDispose { conn.close() } }
     val phase by conn.phase.collectAsState()
     val profile by app.session.profile.collectAsState()
@@ -114,13 +116,14 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
 
 @Composable
 private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
+    val teamMode = end.mode == "ball" || end.mode == "beacon"
     Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
             val place = end.place ?: 0
             val title = when {
-                end.mode == "football" && end.result == "win" -> "Победа!"
-                end.mode == "football" && end.result == "draw" -> "Ничья"
-                end.mode == "football" -> "Поражение"
+                teamMode && end.result == "win" -> "Победа!"
+                teamMode && end.result == "draw" -> "Ничья"
+                teamMode -> "Поражение"
                 place == 1 -> "Победа!"
                 else -> "Место $place"
             }
@@ -129,34 +132,39 @@ private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
                 style = MaterialTheme.typography.displaySmall,
                 color = if (end.result == "win") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
             )
-            end.score?.let { score ->
-                val mine = end.team ?: 0
-                Text("Счёт ${score[mine]} : ${score[1 - mine]}", style = MaterialTheme.typography.titleLarge)
-            }
+            Text("${modeName(end.mode)} · ${brawler(end.brawler).name}", style = MaterialTheme.typography.titleMedium)
+            val mine = (end.team ?: 0).coerceIn(0, 1)
+            end.score?.let { Text("Счёт ${it[mine]} : ${it[1 - mine]}", style = MaterialTheme.typography.titleLarge) }
+            end.beacon?.let { Text("Маяк ${it[mine]}% : ${it[1 - mine]}%", style = MaterialTheme.typography.titleLarge) }
             Text("Опыт +${end.xpGained}", style = MaterialTheme.typography.titleLarge)
             Button(onClick = onAgain, modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()) { Text("Ещё бой") }
             OutlinedButton(onClick = onExit, modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()) { Text("В меню") }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth()) {
-                Text("#", Modifier.weight(0.5f), fontWeight = FontWeight.Bold)
-                Text("Боец", Modifier.weight(3f), fontWeight = FontWeight.Bold)
-                if (end.mode == "football") Text("Голы", Modifier.weight(1.2f), fontWeight = FontWeight.Bold)
-                Text("Убийства", Modifier.weight(1.5f), fontWeight = FontWeight.Bold)
-                Text("Смерти", Modifier.weight(1.5f), fontWeight = FontWeight.Bold)
+                Text("#", Modifier.weight(0.6f), fontWeight = FontWeight.Bold)
+                Text("Игрок", Modifier.weight(3f), fontWeight = FontWeight.Bold)
+                if (end.mode == "ball") Text("Голы", Modifier.weight(1.2f), fontWeight = FontWeight.Bold)
+                if (!teamMode) Text("Кубы", Modifier.weight(1.2f), fontWeight = FontWeight.Bold)
+                Text("Побед.", Modifier.weight(1.4f), fontWeight = FontWeight.Bold)
             }
             end.results.forEach { r ->
                 val color = when {
                     r.you -> MaterialTheme.colorScheme.primary
-                    end.mode == "football" && r.team == end.team -> Color(0xFF4FC3F7)
+                    end.mode != "survival" && r.team == end.team -> Color(0xFF4FC3F7)
                     else -> MaterialTheme.colorScheme.onSurface
                 }
                 Row(Modifier.fillMaxWidth()) {
-                    Text("${r.place}", Modifier.weight(0.5f), color = color)
-                    Text(r.name, Modifier.weight(3f), color = color, fontWeight = if (r.you) FontWeight.Bold else null)
-                    if (end.mode == "football") Text("${r.goals}", Modifier.weight(1.2f), color = color)
-                    Text("${r.kills}", Modifier.weight(1.5f), color = color)
-                    Text("${r.deaths}", Modifier.weight(1.5f), color = color)
+                    Text(if (r.place > 0) "${r.place}" else "—", Modifier.weight(0.6f), color = color)
+                    Text(
+                        "${r.name} · ${brawler(r.brawler).name}",
+                        Modifier.weight(3f),
+                        color = color,
+                        fontWeight = if (r.you) FontWeight.Bold else null,
+                    )
+                    if (end.mode == "ball") Text("${r.goals}", Modifier.weight(1.2f), color = color)
+                    if (!teamMode) Text("${r.cubes}", Modifier.weight(1.2f), color = color)
+                    Text("${r.kills}", Modifier.weight(1.4f), color = color)
                 }
             }
         }

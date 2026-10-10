@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.fightingarena.app.ArenaApp
 import com.fightingarena.app.data.MatchSummary
+import com.fightingarena.app.data.brawler
+import com.fightingarena.app.data.modeName
 import kotlinx.coroutines.launch
 
 @Composable
@@ -53,17 +55,19 @@ fun HistoryScreen(app: ArenaApp, onBack: () -> Unit) {
                     items(items, key = { it.id }) { f ->
                         ListItem(
                             headlineContent = {
+                                val team = f.mode == "ball" || f.mode == "beacon" || f.mode == "football"
                                 val outcome = when {
-                                    f.result == "win" -> "Победа"
                                     f.result == "draw" -> "Ничья"
-                                    f.mode == "football" -> "Поражение"
-                                    else -> "Место ${f.place} из ${f.players}"
+                                    team && f.result == "win" -> "Победа"
+                                    team -> "Поражение"
+                                    else -> "Место ${f.place}"
                                 }
-                                Text("${if (f.mode == "football") "Футбол" else "Схватка"} · $outcome")
+                                val who = f.brawler?.let { " · ${brawler(it).name}" }.orEmpty()
+                                Text("${modeName(f.mode)}$who · $outcome")
                             },
                             supportingContent = {
-                                val goals = if (f.mode == "football") "голы ${f.goals} · " else ""
-                                Text("${goals}убийства ${f.kills} · смерти ${f.deaths} · урон ${f.damage} · опыт +${f.xpGained}")
+                                val goals = if (f.mode == "ball" || f.mode == "football") "голы ${f.goals} · " else ""
+                                Text("${goals}победил ${f.kills} · выбыл ${f.deaths} · урон ${f.damage} · опыт +${f.xpGained}")
                             },
                         )
                         HorizontalDivider()

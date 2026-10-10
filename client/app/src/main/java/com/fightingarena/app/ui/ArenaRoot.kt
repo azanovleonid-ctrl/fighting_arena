@@ -64,7 +64,7 @@ private fun MainNav(app: ArenaApp) {
             )
         }
         composable("fight/{mode}") { entry ->
-            GameScreen(app, mode = entry.arguments?.getString("mode") ?: "brawl", onExit = { nav.popBackStack() })
+            GameScreen(app, mode = entry.arguments?.getString("mode") ?: "survival", onExit = { nav.popBackStack() })
         }
         composable("history") { HistoryScreen(app, onBack = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(app, onBack = { nav.popBackStack() }) }

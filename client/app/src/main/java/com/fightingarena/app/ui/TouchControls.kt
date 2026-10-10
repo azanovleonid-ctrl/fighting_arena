@@ -17,13 +17,13 @@ class Stick(val pointer: PointerId, val origin: Offset) {
 
 /**
  * Twin-stick controls: a finger on the left half moves, a finger on the right half aims and
- * fires on release (a short tap auto-aims). The super button sits above the right thumb.
+ * fires on release (a short tap auto-aims). The super button above the right thumb works the
+ * same way: tap for the nearest enemy, drag to aim.
  */
 class TouchControls(val stickRadius: Float, val superRadius: Float) {
     var move by mutableStateOf<Stick?>(null)
     var aim by mutableStateOf<Stick?>(null)
-    var lastAim = Offset.Zero
-        private set
+    var superStick by mutableStateOf<Stick?>(null)
     private var sentMove = Offset.Zero
     private var lastSentAt = 0L
 
@@ -31,8 +31,13 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
 
     fun moveVector(): Offset = move?.let { normalized(it.pos - it.origin) } ?: Offset.Zero
 
-    /** Aim direction, or zero while the finger is still inside the dead zone (tap = auto-aim). */
-    fun aimVector(): Offset = aim?.let { normalized(it.pos - it.origin) }?.takeIf { it.getDistance() > 0.2f } ?: Offset.Zero
+    /** Aim vector (length 0–1 = how far), or zero while the finger is inside the dead zone (tap = auto-aim). */
+    fun aimVector(): Offset = vectorOf(aim)
+
+    fun superVector(): Offset = vectorOf(superStick)
+
+    private fun vectorOf(stick: Stick?): Offset =
+        stick?.let { normalized(it.pos - it.origin) }?.takeIf { it.getDistance() > 0.2f } ?: Offset.Zero
 
     private fun normalized(d: Offset): Offset {
         val len = d.getDistance()
@@ -54,7 +59,7 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
 
     fun onDown(id: PointerId, at: Offset, size: IntSize, conn: ArenaConnection) {
         when {
-            (at - superCenter(size)).getDistance() <= superRadius * 1.3f -> conn.superAttack(lastAim.x, lastAim.y)
+            (at - superCenter(size)).getDistance() <= superRadius * 1.3f -> if (superStick == null) superStick = Stick(id, at)
             at.x < size.width / 2f -> if (move == null) move = Stick(id, at)
             else -> if (aim == null) aim = Stick(id, at)
         }
@@ -62,11 +67,8 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
 
     fun onDrag(id: PointerId, at: Offset) {
         move?.takeIf { it.pointer == id }?.pos = at
-        aim?.takeIf { it.pointer == id }?.let {
-            it.pos = at
-            val v = aimVector()
-            if (v != Offset.Zero) lastAim = v
-        }
+        aim?.takeIf { it.pointer == id }?.pos = at
+        superStick?.takeIf { it.pointer == id }?.pos = at
     }
 
     fun onUp(id: PointerId, conn: ArenaConnection) {
@@ -76,6 +78,11 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
             val v = aimVector()
             conn.fire(v.x, v.y)
             aim = null
+        }
+        if (superStick?.pointer == id) {
+            val v = superVector()
+            conn.superAttack(v.x, v.y)
+            superStick = null
         }
     }
 }
