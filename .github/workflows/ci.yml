@@ -50,17 +50,17 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew assembleDebug --stacktrace -PversionCode=$((VERSION_CODE + 100)) -PversionName=$VERSION_NAME
+      - run: ./gradlew assembleRelease --stacktrace -PversionCode=$((VERSION_CODE + 100)) -PversionName=$VERSION_NAME
       - uses: actions/upload-artifact@v4
         with:
           name: arena-debug-apk
-          path: client/app/build/outputs/apk/debug/*.apk
+          path: client/app/build/outputs/apk/release/*.apk
       - name: Publish the APK for in-app updates
         if: github.event_name == 'push' && github.ref == 'refs/heads/claude/project-thread-6laoi3'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk arena.apk
+          cp app/build/outputs/apk/release/app-release.apk arena.apk
           echo "{\"versionCode\": $((VERSION_CODE + 100)), \"versionName\": \"$VERSION_NAME\"}" > version.json
           gh release create "android-$VERSION_CODE" arena.apk version.json \
             --target "$GITHUB_SHA" --title "Арена бойцов $VERSION_NAME" --notes "Сборка из $GITHUB_SHA" --latest

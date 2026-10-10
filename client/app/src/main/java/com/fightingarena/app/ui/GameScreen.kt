@@ -90,12 +90,15 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
     val speed = brawler(start.brawler).speed.toFloat()
     val haptics = LocalHapticFeedback.current
     var frame by remember { mutableLongStateOf(0L) }
+    val fps = remember { FloatArray(1) }
 
     LaunchedEffect(conn) {
         var lastHp = Int.MAX_VALUE
         while (true) {
             withFrameNanos { now ->
+                if (frame != 0L && now > frame) fps[0] = fps[0] * 0.95f + 0.05f * (1e9f / (now - frame))
                 frame = now
+                conn.maybePing(now)
                 controls.flushMove(conn, now)
                 predictor.update(now, conn.latest, start.you, controls.moveVector(), speed)
                 local.step(now, conn.latest, predictor.pos)
@@ -118,7 +121,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
             .pointerInput(conn) { handleTouches(controls, conn) },
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawArena(conn, start, controls, paints, predictor.pos, local, frame)
+            drawArena(conn, start, controls, paints, predictor.pos, local, "${fps[0].toInt()} к/с · пинг ${conn.pingMs?.let { "$it мс" } ?: "—"}", frame)
         }
     }
 }

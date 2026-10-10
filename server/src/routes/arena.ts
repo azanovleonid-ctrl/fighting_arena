@@ -46,6 +46,7 @@ export async function arenaRoutes(app: FastifyInstance, opts: { arena: Arena }) 
         arena.join(client, isMode(msg.mode) ? msg.mode : settings.mode);
       }
       else if (msg.t === "leave") arena.leave(client);
+      else if (msg.t === "ping") client.send({ t: "pong", c: (msg as { c?: unknown }).c });
       else if (typeof msg.t === "string") arena.input(client, msg as { t: string });
     });
     socket.on("close", () => arena.leave(client));

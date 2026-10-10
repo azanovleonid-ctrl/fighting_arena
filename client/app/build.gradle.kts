@@ -35,8 +35,10 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("debug")
         }
+        // The game ships as a release build: debug builds run Compose several times slower.
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

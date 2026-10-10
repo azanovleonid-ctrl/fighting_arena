@@ -74,6 +74,7 @@ fun DrawScope.drawArena(
     paints: ArenaPaints,
     predicted: Offset?,
     local: LocalShots,
+    netStats: String,
     nowNanos: Long,
 ) {
     val latest = conn.latest ?: return
@@ -320,6 +321,9 @@ fun DrawScope.drawArena(
     }
 
     drawHud(latest.players.find { it.id == start.you }, latest, controls, paints, start, mine)
+    paints.hud.textAlign = Paint.Align.LEFT
+    paints.hud.textSize = 10f * size.height / 360f
+    drawContext.canvas.nativeCanvas.drawText(netStats, 16f * size.height / 360f, size.height - 8f * size.height / 360f, paints.hud)
 }
 
 private fun lerpColor(a: Color, b: Color, k: Float): Color {

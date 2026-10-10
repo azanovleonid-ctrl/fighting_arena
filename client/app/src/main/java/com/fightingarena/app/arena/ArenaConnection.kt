@@ -96,6 +96,18 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
         send("""{"t":"play","mode":"$mode","brawler":"$brawler"}""")
     }
 
+    /** Round trip to the server in ms, measured with ping messages; null until the first answer. */
+    @Volatile var pingMs: Int? = null
+        private set
+    private var lastPingNanos = 0L
+
+    /** Sends a ping about once a second (called from the frame loop). */
+    fun maybePing(nowNanos: Long) {
+        if (nowNanos - lastPingNanos < 1_000_000_000L) return
+        lastPingNanos = nowNanos
+        send("""{"t":"ping","c":${System.nanoTime()}}""")
+    }
+
     fun move(x: Float, y: Float) = send("""{"t":"move","mx":$x,"my":$y}""")
     fun fire(ax: Float, ay: Float) = send("""{"t":"fire","ax":$ax,"ay":$ay}""")
     fun superAttack(ax: Float, ay: Float) = send("""{"t":"super","ax":$ax,"ay":$ay}""")
@@ -116,6 +128,9 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
                 "queued" -> _phase.value = Phase.Queued
                 "start" -> _phase.value = Phase.Playing(json.decodeFromJsonElement(StartMsg.serializer(), obj))
                 "state" -> receive(json.decodeFromJsonElement(StateMsg.serializer(), obj))
+                "pong" -> obj["c"]?.jsonPrimitive?.content?.toLongOrNull()?.let {
+                    pingMs = ((System.nanoTime() - it) / 1_000_000L).toInt()
+                }
                 "end" -> _phase.value = Phase.Ended(json.decodeFromJsonElement(EndMsg.serializer(), obj))
             }
         }
@@ -131,6 +146,23 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
 
     companion object {
         private const val RENDER_DELAY_MS = 100.0
-        private val client = OkHttpClient.Builder().pingInterval(15, TimeUnit.SECONDS).build()
+        // TCP_NODELAY: send each tiny input message at once instead of batching them (Nagle's algorithm).
+        private val client = OkHttpClient.Builder()
+            .pingInterval(15, TimeUnit.SECONDS)
+            .socketFactory(NoDelaySocketFactory())
+            .build()
     }
+}
+
+/** Opens sockets with TCP_NODELAY so small game messages are not held back. */
+private class NoDelaySocketFactory : javax.net.SocketFactory() {
+    private val base = javax.net.SocketFactory.getDefault()
+    private fun tune(s: java.net.Socket) = s.apply { tcpNoDelay = true }
+    override fun createSocket() = tune(base.createSocket())
+    override fun createSocket(host: String, port: Int) = tune(base.createSocket(host, port))
+    override fun createSocket(host: String, port: Int, localHost: java.net.InetAddress, localPort: Int) =
+        tune(base.createSocket(host, port, localHost, localPort))
+    override fun createSocket(host: java.net.InetAddress, port: Int) = tune(base.createSocket(host, port))
+    override fun createSocket(address: java.net.InetAddress, port: Int, localAddress: java.net.InetAddress, localPort: Int) =
+        tune(base.createSocket(address, port, localAddress, localPort))
 }
