@@ -24,6 +24,8 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
     var move by mutableStateOf<Stick?>(null)
     var aim by mutableStateOf<Stick?>(null)
     var superStick by mutableStateOf<Stick?>(null)
+    /** Called right after a shot is sent, so the phone can draw it at once. */
+    var onFire: ((Offset) -> Unit)? = null
     private var sentMove = Offset.Zero
     private var lastSentAt = 0L
 
@@ -77,6 +79,7 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
         if (a?.pointer == id) {
             val v = aimVector()
             conn.fire(v.x, v.y)
+            onFire?.invoke(v)
             aim = null
         }
         if (superStick?.pointer == id) {

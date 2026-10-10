@@ -73,6 +73,7 @@ fun DrawScope.drawArena(
     controls: TouchControls,
     paints: ArenaPaints,
     predicted: Offset?,
+    local: LocalShots,
     nowNanos: Long,
 ) {
     val latest = conn.latest ?: return
@@ -188,6 +189,7 @@ fun DrawScope.drawArena(
         for (s in cur.shots) {
             val q = prevShots[s.id] ?: s
             val pos = Offset(lerp(q.x, s.x, t), lerp(q.y, s.y, t))
+            if (local.covers(s.k, s.o, s.s, pos)) continue
             val color = sideColor(s.tm, s.o).let { if (s.o == start.you) Color(0xFFFFF176) else it }
             when (s.k) {
                 "bomb" -> {
@@ -212,6 +214,8 @@ fun DrawScope.drawArena(
                 }
             }
         }
+
+        drawLocalShots(local, nowNanos)
 
         for (u in cur.turrets) {
             val pos = Offset(u.x, u.y)
@@ -277,6 +281,7 @@ fun DrawScope.drawArena(
         }
 
         for (e in cur.fx) {
+            if (e.k == "slash" && local.slashes.isNotEmpty()) continue // already drawn by the phone
             val fade = (1f - e.age / 400f).coerceIn(0f, 1f)
             val pos = Offset(e.x, e.y)
             when (e.k) {
@@ -479,4 +484,34 @@ private fun DrawScope.drawStick(stick: Stick, radius: Float, color: Color) {
     val len = d.getDistance()
     val knob = if (len > radius) stick.origin + d * (radius / len) else stick.pos
     drawCircle(color.copy(alpha = 0.7f), radius * 0.4f, knob)
+}
+
+/** Your own attack, drawn the moment you fire (see LocalShots). */
+private fun DrawScope.drawLocalShots(local: LocalShots, nowNanos: Long) {
+    val mine = Color(0xFFFFF176)
+    for (s in local.shots) {
+        val pos = Offset(s.x, s.y)
+        drawCircle(Color.Black.copy(alpha = 0.3f), 10f, pos + Offset(0f, 4f))
+        drawCircle(mine, 8f, pos)
+    }
+    for (b in local.bombs) {
+        val k = ((nowNanos - b.bornNanos) / 550_000_000f).coerceIn(0f, 1f)
+        val pos = b.from + (b.to - b.from) * k
+        drawCircle(mine.copy(alpha = 0.25f), 85f, b.to)
+        drawCircle(mine.copy(alpha = 0.6f), 85f, b.to, style = Stroke(3f))
+        val lift = sin(PI.toFloat() * k) * 90f
+        drawCircle(Color.Black.copy(alpha = 0.3f), 12f, pos)
+        drawCircle(Color(0xFF37474F), 14f, pos - Offset(0f, lift))
+    }
+    for (sl in local.slashes) {
+        val fade = (1f - (nowNanos - sl.bornNanos) / 300_000_000f).coerceIn(0f, 1f)
+        drawArc(
+            Color.White.copy(alpha = 0.6f * fade),
+            startAngle = Math.toDegrees((sl.angle - 0.95).toDouble()).toFloat(),
+            sweepAngle = Math.toDegrees(1.9).toFloat(),
+            useCenter = true,
+            topLeft = sl.at - Offset(150f, 150f),
+            size = Size(300f, 300f),
+        )
+    }
 }
