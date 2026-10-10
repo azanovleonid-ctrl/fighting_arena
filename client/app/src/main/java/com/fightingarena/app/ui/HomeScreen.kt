@@ -33,6 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -131,8 +133,14 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
     ) {
         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(Modifier.size(28.dp)) {
-                drawCircle(b.color)
-                drawCircle(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
+                if (b.id == "hammer") {
+                    // The bear, standing still, scaled to fit the card.
+                    val k = size.minDimension / 100f
+                    scale(k, k, pivot = center) { drawBear(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f) }
+                } else {
+                    drawCircle(b.color)
+                    drawCircle(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
+                }
             }
             Text(b.name, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
             Text(b.role, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 1)

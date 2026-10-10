@@ -50,6 +50,8 @@ private val GUIDE = Color.White.copy(alpha = 0.4f)
 private val SUPER_GUIDE = Color(0xFFFFCA28).copy(alpha = 0.45f)
 
 class ArenaPaints {
+    /** Walk cycles of the bears on screen, by player id. */
+    val walks = HashMap<Int, WalkState>()
     val name = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -240,17 +242,32 @@ fun DrawScope.drawArena(
                 isAlly(p.tm) -> BLUE
                 else -> RED
             }
-            drawCircle(Color.Black.copy(alpha = 0.25f * alpha), radius, base + Offset(0f, 6f))
-            drawCircle(info.color.copy(alpha = alpha), r, pos)
-            if (p.sl) drawCircle(Color(0xFF81D4FA).copy(alpha = 0.5f), r, pos)
-            drawCircle(side.copy(alpha = alpha), r, pos, style = Stroke(5f))
-            val face = dir(p.f)
-            drawLine(Color(0xFF263238).copy(alpha = alpha), pos + face * (r * 0.5f), pos + face * (r + 14f), strokeWidth = 10f)
-            if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r + 10f, pos, style = Stroke(5f))
-            paints.name.textSize = 22f
-            drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
+            val bear = p.b == "hammer"
+            if (bear) {
+                val walk = paints.walks.getOrPut(p.id) { WalkState(base.x, base.y) }
+                walk.advance(base, p.f)
+                val swing = if (p.id == start.you) {
+                    local.slashes.lastOrNull()?.let { (nowNanos - it.bornNanos) / 300_000_000f }
+                } else {
+                    cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
+                        .minByOrNull { it.age }?.let { it.age / 300f }
+                }
+                drawBear(pos, walk, side, alpha, swing?.takeIf { it < 1f } ?: 0f)
+                if (p.sl) drawCircle(Color(0xFF81D4FA).copy(alpha = 0.4f), r + 6f, pos - Offset(0f, 20f))
+                if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r + 24f, pos - Offset(0f, 20f), style = Stroke(5f))
+            } else {
+                drawCircle(Color.Black.copy(alpha = 0.25f * alpha), radius, base + Offset(0f, 6f))
+                drawCircle(info.color.copy(alpha = alpha), r, pos)
+                if (p.sl) drawCircle(Color(0xFF81D4FA).copy(alpha = 0.5f), r, pos)
+                drawCircle(side.copy(alpha = alpha), r, pos, style = Stroke(5f))
+                val face = dir(p.f)
+                drawLine(Color(0xFF263238).copy(alpha = alpha), pos + face * (r * 0.5f), pos + face * (r + 14f), strokeWidth = 10f)
+                if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r + 10f, pos, style = Stroke(5f))
+                paints.name.textSize = 22f
+                drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
+            }
 
-            val barTop = pos.y - r - 22f
+            val barTop = if (bear) pos.y - 84f else pos.y - r - 22f
             val hpColor = when {
                 p.id == start.you -> ME
                 isAlly(p.tm) -> BLUE
