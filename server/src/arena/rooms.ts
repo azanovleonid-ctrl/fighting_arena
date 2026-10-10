@@ -1,13 +1,24 @@
 // Matchmaking and the per-match game loop. Sockets are abstracted as `Client` so tests can fake them.
-import { BASE_STATS, type Stats } from "../game/progression.js";
+import { BRAWLER_IDS, type BrawlerId } from "./brawlers.js";
 import { TILE } from "./map.js";
-import { BALL_RADIUS, Match, MODES, PLAYER_RADIUS, WEAPONS, type Mode, type Placement, type Player, type Rng, type Weapon } from "./sim.js";
+import {
+  BALL_RADIUS,
+  BEACON_RADIUS,
+  isSurvival,
+  Match,
+  MODES,
+  PLAYER_RADIUS,
+  type Mode,
+  type Placement,
+  type Player,
+  type Rng,
+} from "./sim.js";
 
 export interface Client {
   userId: string;
   name: string;
-  stats: Stats;
-  weapon: Weapon;
+  brawler: BrawlerId;
+  level: number;
   send(msg: unknown): void;
 }
 
@@ -17,22 +28,25 @@ export interface ArenaOptions {
   tickMs: number;
   /** Overrides every mode's match length (tests). */
   durationMs?: number;
-  /** Called once per finished match with every human's placement. Returns XP per user id. */
+  /** Called with the humans whose results became final. Returns XP per user id. */
   onFinish(mode: Mode, results: Placement[], playerCount: number): Promise<Map<string, number>>;
 }
 
 export const DEFAULT_ARENA = { queueWaitMs: 3000, tickMs: 33 };
 
-export const MODE_RULES: Record<Mode, { players: number; durationMs: number }> = {
-  brawl: { players: 6, durationMs: 120_000 },
-  football: { players: 6, durationMs: 150_000 },
+/** Survival modes end when one team is left; their length is only a safety cap. */
+export const MODE_RULES: Record<Mode, { players: number; teams: number; durationMs: number }> = {
+  survival: { players: 6, teams: 6, durationMs: 240_000 },
+  duo: { players: 6, teams: 3, durationMs: 240_000 },
+  ball: { players: 6, teams: 2, durationMs: 150_000 },
+  beacon: { players: 6, teams: 2, durationMs: 150_000 },
 };
 
 const BOT_NAMES = ["Громила", "Тень", "Бешеный Пёс", "Кузнец", "Вихрь", "Молчун", "Медведь", "Лис", "Кобра", "Шип"];
 
 interface Room {
   match: Match;
-  members: Map<Client, number>; // client -> player id
+  members: Map<Client, number>; // client -> player id, until their result is final
   timer: NodeJS.Timeout;
 }
 
@@ -60,16 +74,12 @@ export class Arena {
   leave(client: Client) {
     for (const q of this.queues.values()) q.clients = q.clients.filter((c) => c !== client);
     const room = this.roomOf.get(client);
-    if (room) {
-      const id = room.members.get(client);
-      if (id !== undefined) room.match.removePlayer(id);
-      room.members.delete(client);
-      this.roomOf.delete(client);
-      if (room.members.size === 0) {
-        clearInterval(room.timer);
-        this.rooms.delete(room);
-      }
-    }
+    if (!room) return;
+    const id = room.members.get(client);
+    if (id !== undefined) room.match.dropToBot(id);
+    room.members.delete(client);
+    this.roomOf.delete(client);
+    if (room.members.size === 0) this.close(room);
   }
 
   input(client: Client, msg: { t: string; mx?: number; my?: number; ax?: number; ay?: number }) {
@@ -95,27 +105,28 @@ export class Arena {
     const q = this.queues.get(mode)!;
     if (q.timer) clearTimeout(q.timer);
     q.timer = null;
-    const size = MODE_RULES[mode].players;
+    const { players: size, teams } = MODE_RULES[mode];
     const humans = q.clients.splice(0, size);
     if (humans.length === 0) return;
     if (q.clients.length > 0) q.timer = setTimeout(() => this.startMatch(mode), this.opts.queueWaitMs);
 
     const match = new Match(mode, this.opts.durationMs ?? MODE_RULES[mode].durationMs, this.opts.rng);
     const members = new Map<Client, number>();
-    // Football: humans alternate between teams so friends can end up on either side.
-    humans.forEach((c, i) => members.set(c, match.addPlayer(c.name, c.stats, c.userId, i % 2, c.weapon).id));
-    const names = BOT_NAMES.filter((n) => !humans.some((h) => h.name === n));
-    const teamSizes = [0, 0];
-    for (const p of match.players.values()) teamSizes[p.team === 1 ? 1 : 0]++;
-    for (let i = humans.length; i < size; i++) {
-      const stats = { ...BASE_STATS };
-      const keys = Object.keys(stats) as (keyof Stats)[];
-      // Bots get a few random points so they are not all identical.
-      for (let k = 0; k < 2; k++) stats[keys[Math.floor(this.opts.rng() * keys.length)]] += 1;
-      const name = names.splice(Math.floor(this.opts.rng() * names.length), 1)[0] ?? `Бот ${i}`;
-      const team = teamSizes[0] <= teamSizes[1] ? 0 : 1;
+    const perTeam = size / teams;
+    const teamSizes = Array.from({ length: teams }, () => 0);
+    // Humans are spread over the teams first; bots fill the free places.
+    humans.forEach((c, i) => {
+      const team = i % teams;
       teamSizes[team]++;
-      match.addPlayer(name, stats, null, team, WEAPONS[Math.floor(this.opts.rng() * WEAPONS.length)]);
+      members.set(c, match.addPlayer(c.name, c.brawler, c.level, c.userId, team).id);
+    });
+    const names = BOT_NAMES.filter((n) => !humans.some((h) => h.name === n));
+    for (let i = humans.length; i < size; i++) {
+      const team = teamSizes.findIndex((n) => n < perTeam);
+      teamSizes[team]++;
+      const name = names.splice(Math.floor(this.opts.rng() * names.length), 1)[0] ?? `Бот ${i}`;
+      const brawler = BRAWLER_IDS[Math.floor(this.opts.rng() * BRAWLER_IDS.length) % BRAWLER_IDS.length];
+      match.addPlayer(name, brawler, 1, null, team);
     }
 
     const room: Room = { match, members, timer: setInterval(() => this.tick(room), this.opts.tickMs) };
@@ -123,89 +134,155 @@ export class Arena {
     const map = { cols: match.map.cols, rows: match.map.rows, tile: TILE, layout: match.map.layout, playerRadius: PLAYER_RADIUS };
     for (const [c, id] of members) {
       this.roomOf.set(c, room);
-      c.send({ t: "start", mode, you: id, team: match.players.get(id)!.team, map, durationMs: match.durationMs });
+      const p = match.players.get(id)!;
+      c.send({ t: "start", mode, you: id, team: p.team, brawler: p.brawler.id, map, durationMs: match.durationMs, beaconRadius: BEACON_RADIUS });
     }
   }
 
   private tick(room: Room) {
-    room.match.step(this.opts.tickMs);
-    for (const [c, id] of room.members) c.send(snapshot(room.match, id));
-    if (room.match.isOver) void this.finish(room);
+    const { match } = room;
+    match.step(this.opts.tickMs);
+    const done: [Client, Placement][] = [];
+    for (const [c, id] of room.members) {
+      c.send(snapshot(match, id));
+      const placement = match.placementOf(id);
+      if (placement) done.push([c, placement]);
+    }
+    if (done.length) void this.finish(room, done);
+    if (match.isOver || room.members.size === 0) this.close(room);
   }
 
-  private async finish(room: Room) {
+  private close(room: Room) {
     clearInterval(room.timer);
     this.rooms.delete(room);
+  }
+
+  /** Sends final results to players whose match is over (everyone at the end, or knocked out in survival). */
+  private async finish(room: Room, done: [Client, Placement][]) {
     const { match } = room;
-    const results = match.results();
-    const humans = results.filter((r) => r.userId !== null);
+    for (const [c] of done) {
+      room.members.delete(c);
+      this.roomOf.delete(c);
+    }
+    const humans = done.map(([, p]) => p).filter((p) => p.userId !== null);
     let xp = new Map<string, number>();
     try {
-      xp = await this.opts.onFinish(match.mode, humans, results.length);
+      xp = await this.opts.onFinish(match.mode, humans, match.players.size);
     } catch {
       // Results are still shown even if saving failed.
     }
-    for (const [c, id] of room.members) {
-      const mine = results.find((r) => r.playerId === id);
+    // Survival players knocked out early see the standings so far: place 0 = still fighting.
+    const list = match.isOver
+      ? match.results()
+      : [...match.players.values()].map((p) => match.placementOf(p.id) ?? fallback(p)).sort((a, b) => a.place - b.place);
+    for (const [c, mine] of done) {
       c.send({
         t: "end",
         mode: match.mode,
-        place: mine?.place,
-        result: mine?.result,
-        team: mine?.team,
-        score: match.mode === "football" ? match.score : undefined,
+        brawler: match.players.get(mine.playerId)?.brawler.id,
+        place: mine.place,
+        result: mine.result,
+        team: mine.team,
+        score: match.mode === "ball" ? match.score : undefined,
+        beacon: match.mode === "beacon" ? match.beacon.map((v) => Math.round(v * 100)) : undefined,
         xpGained: xp.get(c.userId) ?? 0,
-        results: results.map((r) => ({
-          name: r.name,
-          place: r.place,
-          team: r.team,
-          kills: r.kills,
-          deaths: r.deaths,
-          goals: r.goals,
-          you: r.playerId === id,
-        })),
+        results: list.map((r) => row(r, r.playerId === mine.playerId)),
       });
-      this.roomOf.delete(c);
     }
   }
 }
 
-const r = Math.round;
+function row(r: Placement, you: boolean) {
+  return { name: r.name, brawler: r.brawler, place: r.place, team: r.team, kills: r.kills, deaths: r.deaths, goals: r.goals, cubes: r.cubes, you };
+}
 
-/** What one player is allowed to see this tick: hidden enemies in bushes are left out. */
+function fallback(p: Player): Placement {
+  return {
+    playerId: p.id,
+    userId: p.userId,
+    name: p.name,
+    brawler: p.brawler.id,
+    team: p.team,
+    place: 0,
+    result: "loss",
+    kills: p.kills,
+    deaths: p.deaths,
+    goals: p.goals,
+    cubes: p.cubesPicked,
+    damage: Math.round(p.damageDealt),
+  };
+}
+
+const r = Math.round;
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/** What one player is allowed to see this tick: hidden enemies (bushes, invisibility) are left out. */
 export function snapshot(match: Match, viewerId: number) {
   const viewer = match.players.get(viewerId);
+  const t = match.time;
+  // A knocked-out duo player watches through the partner's eyes.
+  const eyes = viewer && !viewer.alive && match.mode === "duo"
+    ? [...match.players.values()].find((p) => p.team === viewer.team && p.alive) ?? viewer
+    : viewer;
   const players = [...match.players.values()]
-    .filter((p) => !viewer || match.canSee(viewer, p))
+    .filter((p) => !p.out || p.id === viewerId)
+    .filter((p) => !eyes || match.canSee(eyes, p))
     .map((p: Player) => ({
       id: p.id,
       name: p.name,
+      b: p.brawler.id,
       x: r(p.x),
       y: r(p.y),
-      f: Math.round(p.facing * 100) / 100,
+      f: r2(p.facing),
       hp: r(p.hp),
       maxHp: p.maxHp,
       alive: p.alive,
       c: p.color,
       tm: p.team,
-      w: p.weapon,
       k: p.kills,
+      cu: p.cubes,
+      sh: t < p.shieldUntil,
+      sl: t < p.slowUntil,
+      inv: t < p.invisUntil,
+      air: p.jump ? r2((t - p.jump.start) / (p.jump.end - p.jump.start)) : undefined,
     }));
   const ball = match.ball;
   return {
     t: "state",
-    time: match.time,
+    time: t,
     left: match.timeLeftMs,
     me: viewer && {
-      ammo: Math.round(viewer.ammo * 100) / 100,
-      sup: Math.round(viewer.superCharge * 100) / 100,
-      respawnIn: viewer.alive ? 0 : Math.max(0, viewer.respawnAt - match.time),
+      ammo: r2(viewer.ammo),
+      sup: r2(viewer.superCharge),
+      respawnIn: viewer.alive || viewer.out ? 0 : Math.max(0, viewer.respawnAt - t),
+      out: viewer.out,
+      follow: eyes?.id,
     },
     players,
-    bullets: match.bullets.map((b) => ({ id: b.id, x: r(b.x), y: r(b.y), o: b.ownerId, tm: b.team, s: b.isSuper })),
+    shots: match.shots
+      .filter((s) => t >= s.t0)
+      .map((s) => ({
+        id: s.id,
+        k: s.kind,
+        x: r(s.x),
+        y: r(s.y),
+        o: s.ownerId,
+        tm: s.team,
+        s: s.isSuper,
+        ...(s.kind === "bomb" ? { tx: r(s.tx), ty: r(s.ty), z: r2((t - s.t0) / (s.t1 - s.t0)), br: s.blast } : {}),
+      })),
+    turrets: match.turrets.map((u) => ({ id: u.id, x: r(u.x), y: r(u.y), hp: r(u.hp), maxHp: r(u.maxHp), tm: u.team, o: u.ownerId })),
+    zones: match.zones.map((z) => ({ id: z.id, x: r(z.x), y: r(z.y), r: z.r, tm: z.team })),
+    cubes: match.cubes.map((c) => ({ id: c.id, x: r(c.x), y: r(c.y) })),
+    boxes: isSurvival(match.mode) ? [...match.map.boxes].map(([i, hp]) => [i, r(hp)]) : undefined,
+    fx: match.effects.map((e) => ({ id: e.id, k: e.k, x: r(e.x), y: r(e.y), r: e.r, a: r2(e.a), age: t - e.time })),
+    gas: match.gasRadius !== null ? r(match.gasRadius) : undefined,
+    teamsLeft: isSurvival(match.mode) ? match.teamsLeft : undefined,
     feed: match.kills.slice(-4),
     ball: ball && { x: r(ball.x), y: r(ball.y), h: ball.holderId, r: BALL_RADIUS },
-    score: match.mode === "football" ? match.score : undefined,
-    goal: match.lastGoal && match.time - match.lastGoal.time < 2500 ? match.lastGoal : undefined,
+    score: match.mode === "ball" ? match.score : undefined,
+    beacon: match.mode === "beacon" ? { p: match.beacon.map((v) => r2(v)), s: match.beaconState } : undefined,
+    pause: match.isPaused ? match.pausedUntil - t : 0,
+    goal: match.lastGoal && t - match.lastGoal.time < 2500 ? match.lastGoal : undefined,
   };
 }

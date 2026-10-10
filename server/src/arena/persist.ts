@@ -2,12 +2,14 @@ import type pg from "pg";
 import { applyXp } from "../game/progression.js";
 import type { Mode, Placement } from "./sim.js";
 
-/** XP for one match: result or placement bonus, plus two per kill and five per goal. */
+/** XP for one match: place or result bonus, plus two per knockout and five per goal. */
 export function xpForMatch(mode: Mode, r: Placement): number {
   const base =
-    mode === "football"
-      ? { win: 20, draw: 10, loss: 5 }[r.result]
-      : r.place === 1 ? 20 : r.place <= 3 ? 10 : 5;
+    mode === "survival"
+      ? [20, 14, 10, 6, 4, 2][r.place - 1] ?? 2
+      : mode === "duo"
+        ? [20, 10, 4][r.place - 1] ?? 4
+        : { win: 20, draw: 10, loss: 5 }[r.result];
   return base + r.kills * 2 + r.goals * 5;
 }
 
@@ -32,9 +34,9 @@ export async function saveMatch(pool: pg.Pool, mode: Mode, humans: Placement[], 
         [r.userId, lv.level, lv.xp, lv.levelsGained, +(r.result === "win"), +(r.result === "loss"), +(r.result === "draw")],
       );
       await client.query(
-        `INSERT INTO matches (user_id, mode, place, players, kills, deaths, goals, damage, result, xp_gained)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [r.userId, mode, r.place, playerCount, r.kills, r.deaths, r.goals, r.damage, r.result, xp],
+        `INSERT INTO matches (user_id, mode, brawler, place, players, kills, deaths, goals, cubes, damage, result, xp_gained)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [r.userId, mode, r.brawler, r.place, playerCount, r.kills, r.deaths, r.goals, r.cubes, r.damage, r.result, xp],
       );
       gained.set(r.userId, xp);
     }

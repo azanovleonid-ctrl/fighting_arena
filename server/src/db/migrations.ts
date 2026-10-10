@@ -55,6 +55,10 @@ const MIGRATIONS: string[] = [
   ALTER TABLE matches DROP CONSTRAINT matches_result_check;
   ALTER TABLE matches ADD CONSTRAINT matches_result_check CHECK (result IN ('win', 'loss', 'draw'));
   `,
+  `
+  ALTER TABLE matches ADD COLUMN brawler TEXT;
+  ALTER TABLE matches ADD COLUMN cubes INT NOT NULL DEFAULT 0;
+  `,
 ];
 
 export async function migrate(pool: pg.Pool): Promise<void> {

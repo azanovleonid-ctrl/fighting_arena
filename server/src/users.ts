@@ -1,5 +1,7 @@
 import type pg from "pg";
 import { z } from "zod";
+import { BRAWLER_IDS, type BrawlerId } from "./arena/brawlers.js";
+import { MODES, type Mode } from "./arena/sim.js";
 import { maxHpFor, xpToNextLevel, type Stats } from "./game/progression.js";
 
 export const settingsSchema = z.object({
@@ -7,7 +9,8 @@ export const settingsSchema = z.object({
   theme: z.enum(["dark", "light"]).default("dark"),
   sound: z.boolean().default(true),
   vibration: z.boolean().default(true),
-  weapon: z.enum(["rifle", "shotgun"]).default("rifle"),
+  brawler: z.enum(BRAWLER_IDS as [BrawlerId, ...BrawlerId[]]).default("spark"),
+  mode: z.enum(MODES as [Mode, ...Mode[]]).default("survival"),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
