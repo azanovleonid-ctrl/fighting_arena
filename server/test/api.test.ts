@@ -10,7 +10,8 @@ beforeAll(async () => {
   await pool.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
   await migrate(pool);
   await migrate(pool); // idempotent
-  app = await buildApp({ pool, jwtSecret: "test" });
+  app = await buildApp({ pool, jwtSecret: "test", arena: { queueWaitMs: 50, durationMs: 1500, tickMs: 33 } });
+  await app.listen({ port: 0, host: "127.0.0.1" });
 });
 afterAll(async () => {
   await app.close();
@@ -23,6 +24,10 @@ async function register(username: string) {
   return res.json().token as string;
 }
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
+const wsUrl = () => {
+  const addr = app.server.address() as { port: number };
+  return `ws://127.0.0.1:${addr.port}/arena`;
+};
 
 describe("accounts", () => {
   it("registers, rejects duplicates case-insensitively, and logs in", async () => {
@@ -34,7 +39,7 @@ describe("accounts", () => {
     const ok = await app.inject({ method: "POST", url: "/auth/login", payload: { username: "боец_1", password: "secret1" } });
     expect(ok.statusCode).toBe(200);
     const me = await app.inject({ method: "GET", url: "/me", headers: auth(ok.json().token) });
-    expect(me.json()).toMatchObject({ username: "Боец_1", level: 1, maxHp: 70, settings: { language: "ru", sound: true } });
+    expect(me.json()).toMatchObject({ username: "Боец_1", level: 1, maxHp: 3000, settings: { language: "ru", sound: true } });
   });
 
   it("rejects requests without a token", async () => {
@@ -55,57 +60,56 @@ describe("accounts", () => {
   });
 });
 
-describe("fights", () => {
-  it("plays a fight to the end and records history and xp", async () => {
-    const token = await register("fighter");
-    const start = await app.inject({ method: "POST", url: "/fights", headers: auth(token) });
-    expect(start.statusCode).toBe(201);
-    const id = start.json().id;
-    // Starting again returns the same active fight.
-    expect((await app.inject({ method: "POST", url: "/fights", headers: auth(token) })).json().id).toBe(id);
-
-    const badMove = await app.inject({ method: "POST", url: `/fights/${id}/turn`, headers: auth(token), payload: { attack: "head", blocks: ["legs", "legs"] } });
-    expect(badMove.statusCode).toBe(400);
-
-    let fight = start.json();
-    while (fight.status === "active") {
-      const res = await app.inject({
-        method: "POST",
-        url: `/fights/${id}/turn`,
-        headers: auth(token),
-        payload: { attack: "head", blocks: ["chest", "belly"] },
-      });
-      expect(res.statusCode).toBe(200);
-      fight = res.json();
-    }
-    expect(["win", "loss", "draw"]).toContain(fight.result);
-    expect(fight.xpGained).toBeGreaterThan(0);
-
-    const again = await app.inject({ method: "POST", url: `/fights/${id}/turn`, headers: auth(token), payload: { attack: "head", blocks: ["chest", "belly"] } });
-    expect(again.statusCode).toBe(409);
-
-    const history = await app.inject({ method: "GET", url: "/fights", headers: auth(token) });
-    expect(history.json().items).toHaveLength(1);
-    expect(history.json().items[0]).toMatchObject({ id, result: fight.result });
-
-    const me = (await app.inject({ method: "GET", url: "/me", headers: auth(token) })).json();
-    expect(me.record.wins + me.record.losses + me.record.draws).toBe(1);
-    expect(me.xp).toBe(fight.xpGained);
-  });
-
-  it("does not show one player's fights to another", async () => {
-    const a = await register("owner_a");
-    const b = await register("owner_b");
-    const id = (await app.inject({ method: "POST", url: "/fights", headers: auth(a) })).json().id;
-    expect((await app.inject({ method: "GET", url: `/fights/${id}`, headers: auth(b) })).statusCode).toBe(404);
-  });
-
+describe("profile", () => {
   it("spends free stat points only when available", async () => {
     const token = await register("stats_user");
     const none = await app.inject({ method: "POST", url: "/me/stats", headers: auth(token), payload: { strength: 1 } });
     expect(none.statusCode).toBe(400);
     await pool.query("UPDATE users SET free_points = 2 WHERE username = 'stats_user'");
     const ok = await app.inject({ method: "POST", url: "/me/stats", headers: auth(token), payload: { strength: 1, endurance: 1 } });
-    expect(ok.json()).toMatchObject({ freePoints: 0, stats: { strength: 4, endurance: 4 }, maxHp: 80 });
+    expect(ok.json()).toMatchObject({ freePoints: 0, stats: { strength: 4, endurance: 4 }, maxHp: 3200 });
   });
+});
+
+describe("arena", () => {
+  it("rejects a bad token", async () => {
+    const ws = new WebSocket(`${wsUrl()}?token=nope`);
+    const code = await new Promise<number>((resolve) => ws.addEventListener("close", (e) => resolve(e.code)));
+    expect(code).toBe(4401);
+  });
+
+  it("plays a full match against bots and saves the result", async () => {
+    const token = await register("arena_player");
+    const ws = new WebSocket(`${wsUrl()}?token=${token}`);
+    const seen: Record<string, any> = {};
+    let states = 0;
+    const ended = new Promise<any>((resolve) => {
+      ws.addEventListener("message", (e) => {
+        const msg = JSON.parse(String(e.data));
+        if (msg.t === "hello") ws.send(JSON.stringify({ t: "play" }));
+        if (msg.t === "start") ws.send(JSON.stringify({ t: "move", mx: 1, my: 0 }));
+        if (msg.t === "state") {
+          states++;
+          if (states === 3) ws.send(JSON.stringify({ t: "fire", ax: 0, ay: 0 }));
+        }
+        seen[msg.t] = msg;
+        if (msg.t === "end") resolve(msg);
+      });
+    });
+    const end = await ended;
+    ws.close();
+    expect(seen.start.map.layout.length).toBeGreaterThan(0);
+    expect(seen.state.players.length).toBeGreaterThan(0);
+    expect(seen.state.me.ammo).toBeGreaterThanOrEqual(0);
+    expect(states).toBeGreaterThan(10);
+    expect(end.results).toHaveLength(6);
+    expect(end.results.filter((r: any) => r.you)).toHaveLength(1);
+    expect(end.xpGained).toBeGreaterThan(0);
+
+    const history = (await app.inject({ method: "GET", url: "/matches", headers: auth(token) })).json();
+    expect(history.items).toHaveLength(1);
+    expect(history.items[0]).toMatchObject({ place: end.place, players: 6 });
+    const me = (await app.inject({ method: "GET", url: "/me", headers: auth(token) })).json();
+    expect(me.xp + (me.level - 1) * 50).toBeGreaterThanOrEqual(end.xpGained);
+  }, 10_000);
 });

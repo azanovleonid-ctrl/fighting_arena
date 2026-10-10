@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { HttpError } from "../app.js";
-import { BASE_STATS } from "../game/engine.js";
+import { BASE_STATS } from "../game/progression.js";
 import { hashPassword, verifyPassword } from "../password.js";
 import { toProfile, type UserRow } from "../users.js";
 

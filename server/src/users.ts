@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { z } from "zod";
-import { maxHpFor, xpToNextLevel, type Stats } from "./game/engine.js";
+import { maxHpFor, xpToNextLevel, type Stats } from "./game/progression.js";
 
 export const settingsSchema = z.object({
   language: z.enum(["ru", "en"]).default("ru"),

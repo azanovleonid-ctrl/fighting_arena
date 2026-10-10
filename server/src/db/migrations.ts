@@ -33,6 +33,22 @@ const MIGRATIONS: string[] = [
   CREATE UNIQUE INDEX fights_one_active_per_user ON fights (user_id) WHERE status = 'active';
   CREATE INDEX fights_user_history ON fights (user_id, id DESC);
   `,
+  `
+  DROP TABLE fights;
+  CREATE TABLE matches (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    place      INT NOT NULL,
+    players    INT NOT NULL,
+    kills      INT NOT NULL,
+    deaths     INT NOT NULL,
+    damage     INT NOT NULL,
+    result     TEXT NOT NULL CHECK (result IN ('win', 'loss')),
+    xp_gained  INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX matches_user_history ON matches (user_id, id DESC);
+  `,
 ];
 
 export async function migrate(pool: pg.Pool): Promise<void> {
