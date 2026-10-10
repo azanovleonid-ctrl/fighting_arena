@@ -14,6 +14,8 @@ import okhttp3.WebSocketListener
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
+class Frame(val a: StateMsg, val b: StateMsg, val t: Float)
+
 sealed interface Phase {
     data object Connecting : Phase
     data object Queued : Phase
@@ -30,12 +32,14 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
     private val _phase = MutableStateFlow<Phase>(Phase.Connecting)
     val phase: StateFlow<Phase> = _phase
 
-    @Volatile var previous: StateMsg? = null
+    /** The newest snapshot, for the HUD (ammo, super) and own-brawler prediction. */
+    @Volatile var latest: StateMsg? = null
         private set
-    @Volatile var current: StateMsg? = null
-        private set
-    @Volatile var currentAtNanos: Long = 0
-        private set
+
+    // Recent snapshots. Others are drawn ~100 ms in the past, between two snapshots, so uneven
+    // network delivery does not show up as stutter.
+    private val buffer = ArrayDeque<StateMsg>()
+    private var offsetMs = Double.NaN // local clock minus match clock, tracking the fastest deliveries
 
     private val socket: WebSocket
 
@@ -45,9 +49,49 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
         socket = client.newWebSocket(Request.Builder().url(url).build(), Listener())
     }
 
+    /** Two snapshots around the render time and how far between them (0–1). */
+    fun frame(nowNanos: Long): Frame? = synchronized(buffer) { pick(nowNanos) }
+
+    private fun pick(nowNanos: Long): Frame? {
+        if (buffer.isEmpty() || offsetMs.isNaN()) return null
+        val renderAt = nowNanos / 1e6 - offsetMs - RENDER_DELAY_MS
+        val first = buffer.first()
+        val last = buffer.last()
+        if (renderAt <= first.time) return Frame(first, first, 0f)
+        if (renderAt >= last.time) return Frame(last, last, 0f)
+        for (i in 0 until buffer.size - 1) {
+            val a = buffer[i]
+            val b = buffer[i + 1]
+            if (renderAt < b.time) {
+                val span = (b.time - a.time).coerceAtLeast(1L)
+                return Frame(a, b, ((renderAt - a.time) / span).toFloat().coerceIn(0f, 1f))
+            }
+        }
+        return Frame(last, last, 0f)
+    }
+
+    private fun receive(state: StateMsg) {
+        synchronized(buffer) {
+            // A new match restarts the match clock.
+            if (buffer.isNotEmpty() && state.time < buffer.last().time) {
+                buffer.clear()
+                offsetMs = Double.NaN
+            }
+            buffer.addLast(state)
+            while (buffer.size > 40) buffer.removeFirst()
+            val sample = System.nanoTime() / 1e6 - state.time
+            // Follow faster deliveries at once and slower ones gently (the server clock drifts a little).
+            offsetMs = if (offsetMs.isNaN() || sample < offsetMs) sample else offsetMs + (sample - offsetMs) * 0.02
+        }
+        latest = state
+    }
+
     fun playAgain() {
-        previous = null
-        current = null
+        latest = null
+        synchronized(buffer) {
+            buffer.clear()
+            offsetMs = Double.NaN
+        }
         _phase.value = Phase.Queued
         send("""{"t":"play","mode":"$mode","brawler":"$brawler"}""")
     }
@@ -71,11 +115,7 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
                 "hello" -> playAgain()
                 "queued" -> _phase.value = Phase.Queued
                 "start" -> _phase.value = Phase.Playing(json.decodeFromJsonElement(StartMsg.serializer(), obj))
-                "state" -> {
-                    previous = current
-                    current = json.decodeFromJsonElement(StateMsg.serializer(), obj)
-                    currentAtNanos = System.nanoTime()
-                }
+                "state" -> receive(json.decodeFromJsonElement(StateMsg.serializer(), obj))
                 "end" -> _phase.value = Phase.Ended(json.decodeFromJsonElement(EndMsg.serializer(), obj))
             }
         }
@@ -90,6 +130,7 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
     }
 
     companion object {
+        private const val RENDER_DELAY_MS = 100.0
         private val client = OkHttpClient.Builder().pingInterval(15, TimeUnit.SECONDS).build()
     }
 }

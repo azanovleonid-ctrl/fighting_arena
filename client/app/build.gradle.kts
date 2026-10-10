@@ -13,8 +13,8 @@ android {
         applicationId = "com.fightingarena.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.3.1"
         val apiBaseUrl = project.property("apiBaseUrl") as String
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }

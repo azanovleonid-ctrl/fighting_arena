@@ -30,7 +30,6 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 private const val VIEW_HEIGHT = 780f // world units visible vertically
-private const val TICK_NANOS = 33_000_000f
 private const val KICK_RANGE = 700f
 private const val BOX_HP = 3600f
 private const val GOAL_HALF_WIDTH = 120f
@@ -68,14 +67,24 @@ class ArenaPaints {
 private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 private fun dir(a: Float) = Offset(cos(a), sin(a))
 
-fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchControls, paints: ArenaPaints, nowNanos: Long) {
-    val cur = conn.current ?: return
-    val prev = conn.previous
-    // Render between the previous and the latest snapshot so movement looks smooth.
-    val t = ((nowNanos - conn.currentAtNanos) / TICK_NANOS).coerceIn(0f, 1f)
-    val prevPlayers = prev?.players?.associateBy { it.id }.orEmpty()
-    val prevShots = prev?.shots?.associateBy { it.id }.orEmpty()
+fun DrawScope.drawArena(
+    conn: ArenaConnection,
+    start: StartMsg,
+    controls: TouchControls,
+    paints: ArenaPaints,
+    predicted: Offset?,
+    nowNanos: Long,
+) {
+    val latest = conn.latest ?: return
+    // Everyone else is drawn slightly in the past, between two snapshots, so movement looks smooth.
+    val frame = conn.frame(nowNanos) ?: return
+    val cur = frame.b
+    val prev = frame.a
+    val t = frame.t
+    val prevPlayers = prev.players.associateBy { it.id }
+    val prevShots = prev.shots.associateBy { it.id }
     fun posOf(p: PlayerSnap): Offset {
+        if (p.id == start.you && predicted != null) return predicted
         val q = prevPlayers[p.id]?.takeIf { it.alive == p.alive } ?: p
         return Offset(lerp(q.x, p.x, t), lerp(q.y, p.y, t))
     }
@@ -248,7 +257,7 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
             drawContext.canvas.nativeCanvas.drawText(label, pos.x, barTop - 8f, paints.name)
 
             if (p.id == start.you) {
-                val ammo = cur.me?.ammo ?: 0f
+                val ammo = latest.me?.ammo ?: 0f
                 for (i in 0 until 3) {
                     val fill = (ammo - i).coerceIn(0f, 1f)
                     val o = Offset(pos.x - 33f + i * 23f, pos.y + r + 10f)
@@ -259,7 +268,7 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
         }
 
         cur.ball?.let { b ->
-            val q = prev?.ball ?: b
+            val q = prev.ball ?: b
             val pos = if (b.h != null) Offset(b.x, b.y) else Offset(lerp(q.x, b.x, t), lerp(q.y, b.y, t))
             drawCircle(Color.Black.copy(alpha = 0.3f), b.r, pos + Offset(0f, 6f))
             drawCircle(Color.White, b.r, pos)
@@ -305,7 +314,7 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
         }
     }
 
-    drawHud(me, cur, controls, paints, start, mine)
+    drawHud(latest.players.find { it.id == start.you }, latest, controls, paints, start, mine)
 }
 
 private fun lerpColor(a: Color, b: Color, k: Float): Color {

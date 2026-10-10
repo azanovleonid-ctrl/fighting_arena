@@ -82,6 +82,8 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
     val density = LocalDensity.current
     val controls = remember { TouchControls(with(density) { 64.dp.toPx() }, with(density) { 40.dp.toPx() }) }
     val paints = remember { ArenaPaints() }
+    val predictor = remember(start) { Predictor(start.map) }
+    val speed = brawler(start.brawler).speed.toFloat()
     val haptics = LocalHapticFeedback.current
     var frame by remember { mutableLongStateOf(0L) }
 
@@ -91,7 +93,8 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
             withFrameNanos { now ->
                 frame = now
                 controls.flushMove(conn, now)
-                val me = conn.current?.players?.find { it.id == start.you }
+                predictor.update(now, conn.latest, start.you, controls.moveVector(), speed)
+                val me = conn.latest?.players?.find { it.id == start.you }
                 if (me != null) {
                     if (vibration && me.hp < lastHp && lastHp != Int.MAX_VALUE) {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -109,7 +112,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
             .pointerInput(conn) { handleTouches(controls, conn) },
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawArena(conn, start, controls, paints, frame)
+            drawArena(conn, start, controls, paints, predictor.pos, frame)
         }
     }
 }
