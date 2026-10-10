@@ -1,0 +1,31 @@
+# Server and database on one VM. For Yandex Managed PostgreSQL, drop the db service
+# and point DATABASE_URL at the managed cluster.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: arena
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena}
+      POSTGRES_DB: arena
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arena"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  server:
+    build: ./server
+    environment:
+      DATABASE_URL: postgres://arena:${POSTGRES_PASSWORD:-arena}@db:5432/arena
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
