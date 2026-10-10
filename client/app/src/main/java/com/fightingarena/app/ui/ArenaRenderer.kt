@@ -261,7 +261,7 @@ fun DrawScope.drawArena(
             drawContext.canvas.nativeCanvas.drawText(label, pos.x, barTop - 8f, paints.name)
 
             if (p.id == start.you) {
-                val ammo = latest.me?.ammo ?: 0f
+                val ammo = local.ammo
                 for (i in 0 until 3) {
                     val fill = (ammo - i).coerceIn(0f, 1f)
                     val o = Offset(pos.x - 33f + i * 23f, pos.y + r + 10f)

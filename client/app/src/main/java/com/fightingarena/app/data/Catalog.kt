@@ -20,17 +20,18 @@ data class BrawlerInfo(
     val aim: AimShape,
     val superAim: AimShape,
     val superRange: Int,
+    val reloadMs: Int,
 )
 
 val BRAWLERS = listOf(
-    BrawlerInfo("hammer", "Кувалда", "Танк", 6000, 245, 150, "1500", "Удар молотом по дуге перед собой", "Прыжок с ударом при приземлении", Color(0xFF8D6E63), AimShape.ARC, AimShape.THROW, 520),
-    BrawlerInfo("spark", "Искра", "Ближний бой", 4600, 235, 330, "5 × 330", "Дробовик: веер из 5 дробинок", "Рывок сквозь врагов", Color(0xFFFF7043), AimShape.FAN, AimShape.DASH, 405),
-    BrawlerInfo("boomer", "Бумер", "Боец", 3900, 240, 520, "600 + 600", "Бумеранг: бьёт туда и обратно", "Три бумеранга веером", Color(0xFF66BB6A), AimShape.LINE, AimShape.FAN, 560),
-    BrawlerInfo("tinker", "Винтик", "Инженер", 3600, 235, 520, "2 × 360", "Два болта параллельно", "Турель, которая стреляет сама", Color(0xFFFFCA28), AimShape.LINE, AimShape.SELF, 70),
-    BrawlerInfo("shade", "Тень", "Убийца", 3500, 265, 210, "2 × 520", "Два быстрых кинжала", "Невидимость и скорость", Color(0xFF7E57C2), AimShape.FAN, AimShape.SELF, 0),
-    BrawlerInfo("thunder", "Гром", "Метатель", 3400, 225, 470, "1150", "Бомба через стены", "Ковёр из 5 бомб", Color(0xFFEF5350), AimShape.THROW, AimShape.THROW, 470),
-    BrawlerInfo("blizzard", "Вьюга", "Контроль", 3400, 235, 560, "900", "Ледяной осколок замедляет", "Метель: зона урона и замедления", Color(0xFF4FC3F7), AimShape.LINE, AimShape.THROW, 560),
-    BrawlerInfo("arrow", "Стрела", "Снайпер", 3200, 240, 620, "3 × 380", "Очередь из 3 пуль", "Пробивающий залп из 9 пуль", Color(0xFFEC407A), AimShape.LINE, AimShape.FAN, 720),
+    BrawlerInfo("hammer", "Кувалда", "Танк", 6000, 245, 150, "1500", "Удар молотом по дуге перед собой", "Прыжок с ударом при приземлении", Color(0xFF8D6E63), AimShape.ARC, AimShape.THROW, 520, 1600),
+    BrawlerInfo("spark", "Искра", "Ближний бой", 4600, 235, 330, "5 × 330", "Дробовик: веер из 5 дробинок", "Рывок сквозь врагов", Color(0xFFFF7043), AimShape.FAN, AimShape.DASH, 405, 1500),
+    BrawlerInfo("boomer", "Бумер", "Боец", 3900, 240, 520, "600 + 600", "Бумеранг: бьёт туда и обратно", "Три бумеранга веером", Color(0xFF66BB6A), AimShape.LINE, AimShape.FAN, 560, 1500),
+    BrawlerInfo("tinker", "Винтик", "Инженер", 3600, 235, 520, "2 × 360", "Два болта параллельно", "Турель, которая стреляет сама", Color(0xFFFFCA28), AimShape.LINE, AimShape.SELF, 70, 1200),
+    BrawlerInfo("shade", "Тень", "Убийца", 3500, 265, 210, "2 × 520", "Два быстрых кинжала", "Невидимость и скорость", Color(0xFF7E57C2), AimShape.FAN, AimShape.SELF, 0, 1000),
+    BrawlerInfo("thunder", "Гром", "Метатель", 3400, 225, 470, "1150", "Бомба через стены", "Ковёр из 5 бомб", Color(0xFFEF5350), AimShape.THROW, AimShape.THROW, 470, 1800),
+    BrawlerInfo("blizzard", "Вьюга", "Контроль", 3400, 235, 560, "900", "Ледяной осколок замедляет", "Метель: зона урона и замедления", Color(0xFF4FC3F7), AimShape.LINE, AimShape.THROW, 560, 1400),
+    BrawlerInfo("arrow", "Стрела", "Снайпер", 3200, 240, 620, "3 × 380", "Очередь из 3 пуль", "Пробивающий залп из 9 пуль", Color(0xFFEC407A), AimShape.LINE, AimShape.FAN, 720, 1250),
 )
 
 fun brawler(id: String?): BrawlerInfo = BRAWLERS.find { it.id == id } ?: BRAWLERS[1]

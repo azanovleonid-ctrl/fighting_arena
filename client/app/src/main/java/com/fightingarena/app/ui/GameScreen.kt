@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -84,7 +85,8 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
     val paints = remember { ArenaPaints() }
     val predictor = remember(start) { Predictor(start.map) }
     val local = remember(start) { LocalShots(start) }
-    controls.onFire = { aim -> local.fire(aim, conn.latest, predictor.pos, System.nanoTime()) }
+    controls.onRelease = { aim -> local.kickIfHolding(aim, conn, conn.latest) }
+    controls.trigger = { aim -> local.tryFire(aim, conn, conn.latest, predictor.pos ?: conn.latest?.players?.find { it.id == start.you }?.let { Offset(it.x, it.y) }, System.nanoTime()) }
     val speed = brawler(start.brawler).speed.toFloat()
     val haptics = LocalHapticFeedback.current
     var frame by remember { mutableLongStateOf(0L) }
@@ -97,6 +99,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
                 controls.flushMove(conn, now)
                 predictor.update(now, conn.latest, start.you, controls.moveVector(), speed)
                 local.step(now, conn.latest, predictor.pos)
+                controls.holdFire()
                 val me = conn.latest?.players?.find { it.id == start.you }
                 if (me != null) {
                     if (vibration && me.hp < lastHp && lastHp != Int.MAX_VALUE) {

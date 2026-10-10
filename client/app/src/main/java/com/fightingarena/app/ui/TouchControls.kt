@@ -16,16 +16,18 @@ class Stick(val pointer: PointerId, val origin: Offset) {
 }
 
 /**
- * Twin-stick controls: a finger on the left half moves, a finger on the right half aims and
- * fires on release (a short tap auto-aims). The super button above the right thumb works the
- * same way: tap for the nearest enemy, drag to aim.
+ * Twin-stick controls: a finger on the left half moves. A finger on the right half fires the
+ * moment it touches (at the nearest enemy), and while it is held and dragged it keeps firing
+ * where it points as fast as ammo allows. The super button: tap for the nearest enemy, drag to aim.
  */
 class TouchControls(val stickRadius: Float, val superRadius: Float) {
     var move by mutableStateOf<Stick?>(null)
     var aim by mutableStateOf<Stick?>(null)
     var superStick by mutableStateOf<Stick?>(null)
-    /** Called right after a shot is sent, so the phone can draw it at once. */
-    var onFire: ((Offset) -> Unit)? = null
+    /** Tries to fire with an aim vector (zero = nearest enemy); true when a shot went out. */
+    var trigger: ((Offset) -> Boolean)? = null
+    /** Called when the aim finger is lifted, with where it pointed (used to kick the ball). */
+    var onRelease: ((Offset) -> Unit)? = null
     private var sentMove = Offset.Zero
     private var lastSentAt = 0L
 
@@ -48,6 +50,12 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
         return Offset(d.x * k, d.y * k)
     }
 
+    /** While the aim finger is dragged, keeps firing where it points. */
+    fun holdFire() {
+        val v = aimVector()
+        if (aim != null && v != Offset.Zero) trigger?.invoke(v)
+    }
+
     /** Sends the movement vector when it changed noticeably, at most every 40 ms. */
     fun flushMove(conn: ArenaConnection, nowNanos: Long) {
         val v = moveVector()
@@ -63,7 +71,10 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
         when {
             (at - superCenter(size)).getDistance() <= superRadius * 1.3f -> if (superStick == null) superStick = Stick(id, at)
             at.x < size.width / 2f -> if (move == null) move = Stick(id, at)
-            else -> if (aim == null) aim = Stick(id, at)
+            else -> if (aim == null) {
+                aim = Stick(id, at)
+                trigger?.invoke(Offset.Zero)
+            }
         }
     }
 
@@ -75,11 +86,8 @@ class TouchControls(val stickRadius: Float, val superRadius: Float) {
 
     fun onUp(id: PointerId, conn: ArenaConnection) {
         if (move?.pointer == id) move = null
-        val a = aim
-        if (a?.pointer == id) {
-            val v = aimVector()
-            conn.fire(v.x, v.y)
-            onFire?.invoke(v)
+        if (aim?.pointer == id) {
+            onRelease?.invoke(aimVector())
             aim = null
         }
         if (superStick?.pointer == id) {

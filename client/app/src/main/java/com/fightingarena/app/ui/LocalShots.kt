@@ -1,6 +1,7 @@
 package com.fightingarena.app.ui
 
 import androidx.compose.ui.geometry.Offset
+import com.fightingarena.app.arena.ArenaConnection
 import com.fightingarena.app.arena.MapInfo
 import com.fightingarena.app.arena.StartMsg
 import com.fightingarena.app.arena.StateMsg
@@ -9,7 +10,9 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 
-private const val COOLDOWN_NANOS = 320_000_000L
+// A little over the server's 0.32 s so uneven delivery never gets a shot rejected.
+private const val COOLDOWN_NANOS = 350_000_000L
+private const val AMMO_MAX = 3f
 private const val ARROW_GAP_NANOS = 90_000_000L
 private const val BOMB_NANOS = 550_000_000L
 
@@ -51,16 +54,25 @@ class LocalShots(private val start: StartMsg) {
     private val pending = mutableListOf<Pair<Long, Float>>() // Стрела's burst: when, angle
     private var lastFireNanos = 0L
     private var lastStepNanos = 0L
+    private val info = com.fightingarena.app.data.brawler(start.brawler)
 
-    /** Same aim rules as the server: a zero vector aims at the nearest visible enemy. */
-    fun fire(aim: Offset, latest: StateMsg?, from: Offset?, nowNanos: Long) {
-        val state = latest ?: return
-        val pos = from ?: return
-        val me = state.players.find { it.id == start.you } ?: return
-        val ammo = state.me?.ammo ?: 0f
-        if (!me.alive || ammo < 1f || nowNanos - lastFireNanos < COOLDOWN_NANOS || state.pause > 0) return
-        if (state.ball?.h == start.you) return // that is a kick, the server draws the ball
-        val range = com.fightingarena.app.data.brawler(start.brawler).range.toFloat()
+    /** Ammo as the phone sees it, so a shot never waits for the server to confirm the last one. */
+    var ammo = AMMO_MAX
+        private set
+
+    /**
+     * Fires now if there is ammo and the 0.32 s pause has passed: sends the shot and draws it.
+     * Same aim rules as the server: a zero vector aims at the nearest visible enemy.
+     */
+    fun tryFire(aim: Offset, conn: ArenaConnection, latest: StateMsg?, from: Offset?, nowNanos: Long): Boolean {
+        val state = latest ?: return false
+        val pos = from ?: return false
+        val me = state.players.find { it.id == start.you } ?: return false
+        if (!me.alive || nowNanos - lastFireNanos < COOLDOWN_NANOS || state.pause > 0) return false
+        if (state.ball?.h == start.you || ammo < 1f) return false // with the ball, releasing the finger kicks
+        conn.fire(aim.x, aim.y)
+        ammo -= 1f
+        val range = info.range.toFloat()
         val target = state.players
             .filter { it.alive && it.id != start.you && (start.mode == "survival" || it.tm != me.tm) }
             .minByOrNull { (Offset(it.x, it.y) - pos).getDistance() }
@@ -83,11 +95,12 @@ class LocalShots(private val start: StartMsg) {
                 bombs += LocalBomb(pos, pos + Offset(cos(angle), sin(angle)) * dist, nowNanos)
             }
             else -> {
-                val p = patternOf(start.brawler) ?: return
+                val p = patternOf(start.brawler) ?: return true
                 spawn(p, pos, angle, nowNanos)
                 for (i in 1 until p.burst) pending += (nowNanos + i * ARROW_GAP_NANOS) to angle
             }
         }
+        return true
     }
 
     private fun spawn(p: Pattern, pos: Offset, angle: Float, nowNanos: Long) {
@@ -96,10 +109,19 @@ class LocalShots(private val start: StartMsg) {
         }
     }
 
+    /** Kicks the ball where the aim finger pointed when it is lifted (a tap kicks at the goal). */
+    fun kickIfHolding(aim: Offset, conn: ArenaConnection, latest: StateMsg?) {
+        if (latest?.ball?.h == start.you) conn.fire(aim.x, aim.y)
+    }
+
     /** Advances shots; they stop at walls, boxes, enemies and the end of their range. */
     fun step(nowNanos: Long, latest: StateMsg?, from: Offset?) {
         val dt = if (lastStepNanos == 0L) 0f else ((nowNanos - lastStepNanos) / 1e9f).coerceAtMost(0.05f)
         lastStepNanos = nowNanos
+        ammo = (ammo + dt * 1000f / info.reloadMs).coerceAtMost(AMMO_MAX)
+        // Trust the server again once our own shots have had time to reach it.
+        val server = latest?.me?.ammo
+        if (server != null && nowNanos - lastFireNanos > 500_000_000L && kotlin.math.abs(server - ammo) > 0.4f) ammo = server
         val due = pending.filter { it.first <= nowNanos }
         if (due.isNotEmpty() && from != null) {
             patternOf(start.brawler)?.let { p -> due.forEach { (_, a) -> spawn(p, from, a, nowNanos) } }
