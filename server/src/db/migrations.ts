@@ -49,6 +49,12 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX matches_user_history ON matches (user_id, id DESC);
   `,
+  `
+  ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT 'brawl';
+  ALTER TABLE matches ADD COLUMN goals INT NOT NULL DEFAULT 0;
+  ALTER TABLE matches DROP CONSTRAINT matches_result_check;
+  ALTER TABLE matches ADD CONSTRAINT matches_result_check CHECK (result IN ('win', 'loss', 'draw'));
+  `,
 ];
 
 export async function migrate(pool: pg.Pool): Promise<void> {

@@ -78,7 +78,7 @@ export async function buildApp(deps: AppDeps) {
     ...DEFAULT_ARENA,
     ...deps.arena,
     rng: deps.rng ?? Math.random,
-    onFinish: (humans, count) => saveMatch(deps.pool, humans, count),
+    onFinish: (mode, humans, count) => saveMatch(deps.pool, mode, humans, count),
   });
   app.addHook("onClose", async () => arena.shutdown());
   await app.register(fastifyWebsocket);

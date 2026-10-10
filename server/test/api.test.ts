@@ -54,7 +54,7 @@ describe("accounts", () => {
   it("updates settings partially", async () => {
     const token = await register("settings_user");
     const res = await app.inject({ method: "PATCH", url: "/me/settings", headers: auth(token), payload: { sound: false } });
-    expect(res.json()).toEqual({ language: "ru", theme: "dark", sound: false, vibration: true });
+    expect(res.json()).toEqual({ language: "ru", theme: "dark", sound: false, vibration: true, weapon: "rifle" });
     const bad = await app.inject({ method: "PATCH", url: "/me/settings", headers: auth(token), payload: { volume: 3 } });
     expect(bad.statusCode).toBe(400);
   });
@@ -78,7 +78,7 @@ describe("arena", () => {
     expect(code).toBe(4401);
   });
 
-  it("plays a full match against bots and saves the result", async () => {
+  it("plays a full football match against bots and saves the result", async () => {
     const token = await register("arena_player");
     const ws = new WebSocket(`${wsUrl()}?token=${token}`);
     const seen: Record<string, any> = {};
@@ -86,7 +86,7 @@ describe("arena", () => {
     const ended = new Promise<any>((resolve) => {
       ws.addEventListener("message", (e) => {
         const msg = JSON.parse(String(e.data));
-        if (msg.t === "hello") ws.send(JSON.stringify({ t: "play" }));
+        if (msg.t === "hello") ws.send(JSON.stringify({ t: "play", mode: "football", weapon: "shotgun" }));
         if (msg.t === "start") ws.send(JSON.stringify({ t: "move", mx: 1, my: 0 }));
         if (msg.t === "state") {
           states++;
@@ -108,7 +108,10 @@ describe("arena", () => {
 
     const history = (await app.inject({ method: "GET", url: "/matches", headers: auth(token) })).json();
     expect(history.items).toHaveLength(1);
-    expect(history.items[0]).toMatchObject({ place: end.place, players: 6 });
+    expect(history.items[0]).toMatchObject({ mode: "football", result: end.result, players: 6 });
+    expect(seen.start.mode).toBe("football");
+    expect(seen.state.ball).toBeTruthy();
+    expect(seen.state.score).toHaveLength(2);
     const me = (await app.inject({ method: "GET", url: "/me", headers: auth(token) })).json();
     expect(me.xp + (me.level - 1) * 50).toBeGreaterThanOrEqual(end.xpGained);
   }, 10_000);

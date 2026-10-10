@@ -7,6 +7,7 @@ export const settingsSchema = z.object({
   theme: z.enum(["dark", "light"]).default("dark"),
   sound: z.boolean().default(true),
   vibration: z.boolean().default(true),
+  weapon: z.enum(["rifle", "shotgun"]).default("rifle"),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
