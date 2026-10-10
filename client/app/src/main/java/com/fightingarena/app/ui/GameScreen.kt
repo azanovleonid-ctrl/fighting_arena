@@ -1,5 +1,7 @@
 package com.fightingarena.app.ui
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -10,9 +12,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +37,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -88,6 +93,11 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
     controls.onRelease = { aim -> local.kickIfHolding(aim, conn, conn.latest) }
     controls.trigger = { aim -> local.tryFire(aim, conn, conn.latest, predictor.pos ?: conn.latest?.players?.find { it.id == start.you }?.let { Offset(it.x, it.y) }, System.nanoTime()) }
     val speed = brawler(start.brawler).speed.toFloat()
+    val activity = LocalContext.current as? Activity
+    DisposableEffect(Unit) {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT }
+    }
     val haptics = LocalHapticFeedback.current
     var frame by remember { mutableLongStateOf(0L) }
     val fps = remember { FloatArray(1) }
@@ -129,30 +139,32 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
 @Composable
 private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
     val teamMode = end.mode == "ball" || end.mode == "beacon"
-    Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
-            val place = end.place ?: 0
-            val title = when {
-                teamMode && end.result == "win" -> "Победа!"
-                teamMode && end.result == "draw" -> "Ничья"
-                teamMode -> "Поражение"
-                place == 1 -> "Победа!"
-                else -> "Место $place"
-            }
-            Text(
-                title,
-                style = MaterialTheme.typography.displaySmall,
-                color = if (end.result == "win") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
-            )
-            Text("${modeName(end.mode)} · ${brawler(end.brawler).name}", style = MaterialTheme.typography.titleMedium)
-            val mine = (end.team ?: 0).coerceIn(0, 1)
-            end.score?.let { Text("Счёт ${it[mine]} : ${it[1 - mine]}", style = MaterialTheme.typography.titleLarge) }
-            end.beacon?.let { Text("Маяк ${it[mine]}% : ${it[1 - mine]}%", style = MaterialTheme.typography.titleLarge) }
-            Text("Опыт +${end.xpGained}", style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onAgain, modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()) { Text("Ещё бой") }
-            OutlinedButton(onClick = onExit, modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()) { Text("В меню") }
+    // Portrait, fits on one screen: at most 6 rows in the table.
+    Column(
+        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        val place = end.place ?: 0
+        val title = when {
+            teamMode && end.result == "win" -> "Победа!"
+            teamMode && end.result == "draw" -> "Ничья"
+            teamMode -> "Поражение"
+            place == 1 -> "Победа!"
+            else -> "Место $place"
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Spacer(Modifier.weight(0.5f))
+        Text(
+            title,
+            style = MaterialTheme.typography.displaySmall,
+            color = if (end.result == "win") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+        )
+        Text("${modeName(end.mode)} · ${brawler(end.brawler).name}", style = MaterialTheme.typography.titleMedium)
+        val mine = (end.team ?: 0).coerceIn(0, 1)
+        end.score?.let { Text("Счёт ${it[mine]} : ${it[1 - mine]}", style = MaterialTheme.typography.titleLarge) }
+        end.beacon?.let { Text("Маяк ${it[mine]}% : ${it[1 - mine]}%", style = MaterialTheme.typography.titleLarge) }
+        Text("Опыт +${end.xpGained}", style = MaterialTheme.typography.titleLarge)
+        Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth()) {
                 Text("#", Modifier.weight(0.6f), fontWeight = FontWeight.Bold)
                 Text("Игрок", Modifier.weight(3f), fontWeight = FontWeight.Bold)
@@ -160,7 +172,7 @@ private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
                 if (!teamMode) Text("Кубы", Modifier.weight(1.2f), fontWeight = FontWeight.Bold)
                 Text("Побед.", Modifier.weight(1.4f), fontWeight = FontWeight.Bold)
             }
-            end.results.forEach { r ->
+            end.results.take(6).forEach { r ->
                 val color = when {
                     r.you -> MaterialTheme.colorScheme.primary
                     end.mode != "survival" && r.team == end.team -> Color(0xFF4FC3F7)
@@ -173,6 +185,7 @@ private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
                         Modifier.weight(3f),
                         color = color,
                         fontWeight = if (r.you) FontWeight.Bold else null,
+                        maxLines = 1,
                     )
                     if (end.mode == "ball") Text("${r.goals}", Modifier.weight(1.2f), color = color)
                     if (!teamMode) Text("${r.cubes}", Modifier.weight(1.2f), color = color)
@@ -180,5 +193,8 @@ private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
                 }
             }
         }
+        Spacer(Modifier.weight(1f))
+        Button(onClick = onAgain, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Ещё бой", style = MaterialTheme.typography.titleLarge) }
+        OutlinedButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("В меню") }
     }
 }

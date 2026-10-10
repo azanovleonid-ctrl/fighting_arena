@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -50,7 +48,7 @@ fun SettingsScreen(app: ArenaApp, onBack: () -> Unit) {
     }
 
     Scaffold(topBar = { ArenaTopBar("Настройки", onBack = onBack) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp).widthIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp).widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Choice("Тема", listOf("dark" to "Тёмная", "light" to "Светлая"), settings.theme) { update(settings.copy(theme = it)) }
             Choice("Язык", listOf("ru" to "Русский", "en" to "English"), settings.language) { update(settings.copy(language = it)) }

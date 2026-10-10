@@ -3,6 +3,12 @@ package com.fightingarena.app.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,14 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,48 +74,47 @@ fun HomeScreen(app: ArenaApp, onFight: (mode: String) -> Unit, onHistory: () -> 
     val settings = profile?.settings ?: Settings()
     val chosen = brawler(settings.brawler)
 
-    Scaffold(topBar = { ArenaTopBar("Арена бойцов") }) { padding ->
-        // Landscape: brawlers on the left, mode and menu on the right.
-        Row(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            Column(
-                Modifier.weight(1.5f).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                BRAWLERS.chunked(4).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { b ->
-                            BrawlerCard(b, selected = b.id == chosen.id, Modifier.weight(1f)) { choose { it.copy(brawler = b.id) } }
-                        }
-                    }
-                }
-                BrawlerDetails(chosen)
-            }
-            Column(
-                Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                UpdateBanner(app)
+    // Portrait, everything on one screen without scrolling.
+    Column(
+        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(profile?.username ?: "Арена бойцов", style = MaterialTheme.typography.titleLarge)
                 profile?.let { p ->
-                    Text(p.username, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "Победы ${p.record.wins} · поражения ${p.record.losses} · ничьи ${p.record.draws}",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                MODES.forEach { m -> ModeCard(m, selected = m.id == settings.mode) { choose { it.copy(mode = m.id) } } }
-                Button(onClick = { onFight(settings.mode) }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                    Text("В бой", style = MaterialTheme.typography.titleMedium)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onHistory, modifier = Modifier.weight(1f)) { Text("История") }
-                    OutlinedButton(onClick = onSettings, modifier = Modifier.weight(1f)) { Text("Настройки") }
-                }
-                TextButton(onClick = { scope.launch { app.session.signOut() } }) { Text("Выйти из аккаунта") }
             }
+        }
+        UpdateBanner(app)
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        BRAWLERS.chunked(4).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { b ->
+                    BrawlerCard(b, selected = b.id == chosen.id, Modifier.weight(1f)) { choose { it.copy(brawler = b.id) } }
+                }
+            }
+        }
+        BrawlerDetails(chosen)
+        MODES.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+                row.forEach { m ->
+                    ModeCard(m, selected = m.id == settings.mode, Modifier.weight(1f).fillMaxHeight()) { choose { it.copy(mode = m.id) } }
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Button(onClick = { onFight(settings.mode) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            Text("В бой", style = MaterialTheme.typography.titleLarge)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onClick = onHistory, modifier = Modifier.weight(1f)) { Text("История") }
+            OutlinedButton(onClick = onSettings, modifier = Modifier.weight(1f)) { Text("Настройки") }
+            TextButton(onClick = { scope.launch { app.session.signOut() } }) { Text("Выйти") }
         }
     }
 }
@@ -127,13 +129,13 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
             containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Canvas(Modifier.size(36.dp)) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Canvas(Modifier.size(28.dp)) {
                 drawCircle(b.color)
                 drawCircle(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
             }
-            Text(b.name, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            Text(b.role, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+            Text(b.name, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Text(b.role, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 1)
         }
     }
 }
@@ -141,7 +143,7 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
 @Composable
 private fun BrawlerDetails(b: BrawlerInfo) {
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text("${b.name} · ${b.role}", style = MaterialTheme.typography.titleMedium)
             Text("Здоровье ${b.hp} · скорость ${b.speed} · дальность ${b.range} · урон ${b.damage}", style = MaterialTheme.typography.bodySmall)
             Text("Атака: ${b.attack}", style = MaterialTheme.typography.bodySmall)
@@ -151,10 +153,10 @@ private fun BrawlerDetails(b: BrawlerInfo) {
 }
 
 @Composable
-private fun ModeCard(m: ModeInfo, selected: Boolean, onClick: () -> Unit) {
+private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
@@ -162,7 +164,7 @@ private fun ModeCard(m: ModeInfo, selected: Boolean, onClick: () -> Unit) {
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
             Text(m.name, fontWeight = FontWeight.Bold)
-            Text(m.about, style = MaterialTheme.typography.bodySmall)
+            Text(m.about, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

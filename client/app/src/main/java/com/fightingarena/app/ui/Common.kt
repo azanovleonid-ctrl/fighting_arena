@@ -2,6 +2,8 @@ package com.fightingarena.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -61,15 +63,13 @@ fun UpdateBanner(app: ArenaApp) {
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Вышла новая версия ${info.versionName}")
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Новая версия ${info.versionName}", Modifier.weight(1f))
             val s = state
             if (s is UpdateState.Downloading) {
-                LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.weight(1f))
             } else {
-                Button(onClick = { scope.launch { app.updater.install(info) } }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Обновить")
-                }
+                Button(onClick = { scope.launch { app.updater.install(info) } }) { Text("Обновить") }
             }
         }
     }

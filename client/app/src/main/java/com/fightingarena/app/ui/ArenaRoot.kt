@@ -31,13 +31,8 @@ fun ArenaRoot(app: ArenaApp) {
     val profile by app.session.profile.collectAsState()
     LaunchedEffect(Unit) { app.session.load() }
     val activity = LocalContext.current as? Activity
-    LaunchedEffect(loggedIn) {
-        when (loggedIn) {
-            true -> activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            false -> activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-            null -> Unit
-        }
-    }
+    // Login and menus are portrait; only the battle itself turns to landscape (see ArenaView).
+    LaunchedEffect(Unit) { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT }
 
     val dark = (profile?.settings?.theme ?: "dark") == "dark"
     MaterialTheme(colorScheme = if (dark) Dark else Light) {
