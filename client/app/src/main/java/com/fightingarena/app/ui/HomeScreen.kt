@@ -54,6 +54,7 @@ fun HomeScreen(app: ArenaApp, onFight: (mode: String) -> Unit, onHistory: () -> 
         r.onSuccess { app.session.profile.value = it }
         error = r.errorText()
     }
+    LaunchedEffect(Unit) { app.updater.checkForUpdate() }
 
     // The chosen brawler and mode are saved in the account, so the phone remembers them.
     fun choose(change: (Settings) -> Settings) {
@@ -94,6 +95,7 @@ fun HomeScreen(app: ArenaApp, onFight: (mode: String) -> Unit, onHistory: () -> 
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                UpdateBanner(app)
                 profile?.let { p ->
                     Text(p.username, style = MaterialTheme.typography.titleLarge)
                     Text(

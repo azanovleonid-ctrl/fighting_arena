@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -25,7 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.fightingarena.app.ArenaApp
+import com.fightingarena.app.BuildConfig
 import com.fightingarena.app.data.Settings
+import com.fightingarena.app.data.UpdateState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -53,6 +56,16 @@ fun SettingsScreen(app: ArenaApp, onBack: () -> Unit) {
             Choice("Язык", listOf("ru" to "Русский", "en" to "English"), settings.language) { update(settings.copy(language = it)) }
             Toggle("Звук", settings.sound) { update(settings.copy(sound = it)) }
             Toggle("Вибрация при ударе", settings.vibration) { update(settings.copy(vibration = it)) }
+            val updateState by app.updater.state.collectAsState()
+            Text("Версия ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
+            when (updateState) {
+                UpdateState.Checking -> Text("Проверяем обновления…")
+                UpdateState.UpToDate -> Text("Установлена последняя версия")
+                is UpdateState.Failed -> Text((updateState as UpdateState.Failed).message, color = MaterialTheme.colorScheme.error)
+                else -> Unit
+            }
+            UpdateBanner(app)
+            OutlinedButton(onClick = { scope.launch { app.updater.checkForUpdate() } }) { Text("Проверить обновления") }
         }
     }
 }

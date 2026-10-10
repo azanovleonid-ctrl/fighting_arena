@@ -13,10 +13,12 @@ android {
         applicationId = "com.fightingarena.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.1"
+        versionCode = (project.property("versionCode") as String).toInt()
+        versionName = project.property("versionName") as String
         val apiBaseUrl = project.property("apiBaseUrl") as String
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        val updateBaseUrl = project.property("updateBaseUrl") as String
+        buildConfigField("String", "UPDATE_BASE_URL", "\"$updateBaseUrl\"")
     }
 
     // A fixed debug key so every CI build installs over the previous one and keeps the saved login.

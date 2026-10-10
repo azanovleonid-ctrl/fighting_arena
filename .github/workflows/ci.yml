@@ -34,9 +34,15 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # publishes the APK as a release for in-app updates
     defaults:
       run:
         working-directory: client
+    env:
+      # Every build gets a higher version so the app can offer it as an update.
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 0.4.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -44,8 +50,20 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew assembleDebug --stacktrace
+      - run: ./gradlew assembleDebug --stacktrace -PversionCode=$((VERSION_CODE + 100)) -PversionName=$VERSION_NAME
       - uses: actions/upload-artifact@v4
         with:
           name: arena-debug-apk
           path: client/app/build/outputs/apk/debug/*.apk
+      - name: Publish the APK for in-app updates
+        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/project-thread-6laoi3'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk arena.apk
+          echo "{\"versionCode\": $((VERSION_CODE + 100)), \"versionName\": \"$VERSION_NAME\"}" > version.json
+          gh release create "android-$VERSION_CODE" arena.apk version.json \
+            --target "$GITHUB_SHA" --title "Арена бойцов $VERSION_NAME" --notes "Сборка из $GITHUB_SHA" --latest
+          # Keep only the newest few releases.
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^android-' | sort -t- -k2 -n -r | tail -n +4 |
+            xargs -r -I{} gh release delete {} --yes --cleanup-tag
