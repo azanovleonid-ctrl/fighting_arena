@@ -1,5 +1,7 @@
 package com.fightingarena.app.ui
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -14,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -27,6 +30,14 @@ fun ArenaRoot(app: ArenaApp) {
     val loggedIn by app.session.loggedIn.collectAsState()
     val profile by app.session.profile.collectAsState()
     LaunchedEffect(Unit) { app.session.load() }
+    val activity = LocalContext.current as? Activity
+    LaunchedEffect(loggedIn) {
+        when (loggedIn) {
+            true -> activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            false -> activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            null -> Unit
+        }
+    }
 
     val dark = (profile?.settings?.theme ?: "dark") == "dark"
     MaterialTheme(colorScheme = if (dark) Dark else Light) {
@@ -47,12 +58,14 @@ private fun MainNav(app: ArenaApp) {
         composable("home") {
             HomeScreen(
                 app,
-                onFight = { nav.navigate("fight") },
+                onFight = { mode -> nav.navigate("fight/$mode") },
                 onHistory = { nav.navigate("history") },
                 onSettings = { nav.navigate("settings") },
             )
         }
-        composable("fight") { GameScreen(app, onExit = { nav.popBackStack() }) }
+        composable("fight/{mode}") { entry ->
+            GameScreen(app, mode = entry.arguments?.getString("mode") ?: "brawl", onExit = { nav.popBackStack() })
+        }
         composable("history") { HistoryScreen(app, onBack = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(app, onBack = { nav.popBackStack() }) }
     }

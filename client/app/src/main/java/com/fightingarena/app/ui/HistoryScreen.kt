@@ -52,9 +52,18 @@ fun HistoryScreen(app: ArenaApp, onBack: () -> Unit) {
                 else -> LazyColumn {
                     items(items, key = { it.id }) { f ->
                         ListItem(
-                            headlineContent = { Text(if (f.place == 1) "Победа" else "Место ${f.place} из ${f.players}") },
+                            headlineContent = {
+                                val outcome = when {
+                                    f.result == "win" -> "Победа"
+                                    f.result == "draw" -> "Ничья"
+                                    f.mode == "football" -> "Поражение"
+                                    else -> "Место ${f.place} из ${f.players}"
+                                }
+                                Text("${if (f.mode == "football") "Футбол" else "Схватка"} · $outcome")
+                            },
                             supportingContent = {
-                                Text("Убийства ${f.kills} · смерти ${f.deaths} · урон ${f.damage} · опыт +${f.xpGained}")
+                                val goals = if (f.mode == "football") "голы ${f.goals} · " else ""
+                                Text("${goals}убийства ${f.kills} · смерти ${f.deaths} · урон ${f.damage} · опыт +${f.xpGained}")
                             },
                         )
                         HorizontalDivider()

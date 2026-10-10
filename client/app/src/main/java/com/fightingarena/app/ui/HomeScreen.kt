@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -33,7 +34,7 @@ import com.fightingarena.app.data.StatPoints
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(app: ArenaApp, onFight: () -> Unit, onHistory: () -> Unit, onSettings: () -> Unit) {
+fun HomeScreen(app: ArenaApp, onFight: (mode: String) -> Unit, onHistory: () -> Unit, onSettings: () -> Unit) {
     val profile by app.session.profile.collectAsState()
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -49,6 +50,17 @@ fun HomeScreen(app: ArenaApp, onFight: () -> Unit, onHistory: () -> Unit, onSett
         val r = app.call { app.api.spendPoints(points) }
         r.onSuccess { app.session.profile.value = it }
         error = r.errorText()
+    }
+
+    fun chooseWeapon(weapon: String) {
+        val p = profile ?: return
+        val settings = p.settings.copy(weapon = weapon)
+        app.session.profile.value = p.copy(settings = settings)
+        scope.launch {
+            val r = app.call { app.api.updateSettings(settings) }
+            r.onFailure { app.session.profile.value = p }
+            error = r.errorText()
+        }
     }
 
     Scaffold(topBar = { ArenaTopBar("Арена бойцов") }) { padding ->
@@ -91,7 +103,15 @@ fun HomeScreen(app: ArenaApp, onFight: () -> Unit, onHistory: () -> Unit, onSett
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Button(onClick = onFight, modifier = Modifier.fillMaxWidth()) { Text("В бой!") }
+                Text("Оружие", style = MaterialTheme.typography.titleSmall)
+                val weapon = profile?.settings?.weapon ?: "rifle"
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("rifle" to "Винтовка", "shotgun" to "Дробовик (веер)").forEach { (key, label) ->
+                        FilterChip(selected = weapon == key, onClick = { chooseWeapon(key) }, label = { Text(label) })
+                    }
+                }
+                Button(onClick = { onFight("brawl") }, modifier = Modifier.fillMaxWidth()) { Text("Схватка") }
+                Button(onClick = { onFight("football") }, modifier = Modifier.fillMaxWidth()) { Text("Футбол 3 на 3") }
                 OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) { Text("История боёв") }
                 OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Настройки") }
                 TextButton(onClick = { scope.launch { app.session.signOut() } }) { Text("Выйти из аккаунта") }

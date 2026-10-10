@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore("session")
 private val TOKEN = stringPreferencesKey("token")
+private val LAST_USERNAME = stringPreferencesKey("last_username")
 
 /** Keeps the auth token on disk and the current profile in memory. */
 class Session(private val context: Context) {
@@ -21,13 +22,19 @@ class Session(private val context: Context) {
     private val _loggedIn = MutableStateFlow<Boolean?>(null) // null until the stored token is read
     val loggedIn: StateFlow<Boolean?> = _loggedIn
 
+    /** Name of the last fighter who signed in on this phone, to prefill the login form. */
+    suspend fun lastUsername(): String = context.dataStore.data.map { it[LAST_USERNAME] }.first().orEmpty()
+
     suspend fun load() {
         token = context.dataStore.data.map { it[TOKEN] }.first()
         _loggedIn.value = token != null
     }
 
     suspend fun signIn(auth: AuthResponse) {
-        context.dataStore.edit { it[TOKEN] = auth.token }
+        context.dataStore.edit {
+            it[TOKEN] = auth.token
+            it[LAST_USERNAME] = auth.user.username
+        }
         token = auth.token
         profile.value = auth.user
         _loggedIn.value = true

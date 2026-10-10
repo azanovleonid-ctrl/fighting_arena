@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
 import com.fightingarena.app.arena.ArenaConnection
 import com.fightingarena.app.arena.PlayerSnap
@@ -21,6 +22,10 @@ import kotlin.math.sin
 private const val VIEW_HEIGHT = 720f // world units visible vertically
 private const val TICK_NANOS = 33_000_000f
 private const val BULLET_RANGE = 640f
+private const val SHOTGUN_RANGE = 420f
+private const val SHOTGUN_SPREAD = 0.5f
+private const val KICK_RANGE = 700f
+private val TEAM_COLORS = listOf(Color(0xFF42A5F5), Color(0xFFEF5350))
 
 private val PLAYER_COLORS = listOf(
     Color(0xFF4FC3F7), Color(0xFFFF7043), Color(0xFFAB47BC),
@@ -85,9 +90,13 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
 
         for (r in r0..r1) for (c in c0..c1) {
             val o = Offset(c * tile, r * tile)
-            if (map.tileAt(c, r) == '#') {
+            val ch = map.tileAt(c, r)
+            if (ch == '#') {
                 drawRect(WALL, o, Size(tile, tile))
                 drawRect(WALL_TOP, o, Size(tile, tile * 0.7f))
+            } else if (ch == 'A' || ch == 'B') {
+                drawRect(TEAM_COLORS[if (ch == 'A') 0 else 1].copy(alpha = 0.55f), o, Size(tile, tile))
+                for (k in 1..3) drawLine(Color.White.copy(alpha = 0.5f), o + Offset(0f, k * tile / 4), o + Offset(tile, k * tile / 4), 2f)
             } else {
                 drawRect(if ((r + c) % 2 == 0) FLOOR_A else FLOOR_B, o, Size(tile, tile))
             }
@@ -96,15 +105,29 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
         // Aim guide while the right thumb is dragging.
         val aim = controls.aimVector()
         if (me != null && me.alive && aim != Offset.Zero) {
-            val len = aim.getDistance()
-            val end = mePos + Offset(aim.x / len, aim.y / len) * BULLET_RANGE
-            drawLine(Color.White.copy(alpha = 0.45f), mePos, end, strokeWidth = 14f)
+            val angle = kotlin.math.atan2(aim.y, aim.x)
+            val guide = Color.White.copy(alpha = 0.45f)
+            fun ray(a: Float, range: Float) = drawLine(guide, mePos, mePos + Offset(cos(a), sin(a)) * range, strokeWidth = 12f)
+            when {
+                cur.ball?.h == start.you -> ray(angle, KICK_RANGE)
+                me.w == "shotgun" -> {
+                    ray(angle - SHOTGUN_SPREAD / 2, SHOTGUN_RANGE)
+                    ray(angle, SHOTGUN_RANGE)
+                    ray(angle + SHOTGUN_SPREAD / 2, SHOTGUN_RANGE)
+                }
+                else -> ray(angle, BULLET_RANGE)
+            }
         }
+        fun isAlly(team: Int) = start.isFootball && team == start.team
 
         for (b in cur.bullets) {
             val q = prevBullets[b.id] ?: b
             val pos = Offset(lerp(q.x, b.x, t), lerp(q.y, b.y, t))
-            val color = if (b.o == start.you) Color(0xFFFFF176) else Color(0xFFFF5252)
+            val color = when {
+                b.o == start.you -> Color(0xFFFFF176)
+                isAlly(b.tm) -> Color(0xFF81D4FA)
+                else -> Color(0xFFFF5252)
+            }
             drawCircle(Color.Black.copy(alpha = 0.3f), if (b.s) 13f else 11f, pos + Offset(0f, 4f))
             drawCircle(color, if (b.s) 12f else 9f, pos)
         }
@@ -112,7 +135,7 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
         val radius = map.playerRadius.toFloat()
         for (p in cur.players.filter { it.alive }) {
             val pos = posOf(p)
-            val color = PLAYER_COLORS[p.c % PLAYER_COLORS.size]
+            val color = if (start.isFootball) TEAM_COLORS[p.tm.coerceIn(0, 1)] else PLAYER_COLORS[p.c % PLAYER_COLORS.size]
             drawCircle(Color.Black.copy(alpha = 0.25f), radius, pos + Offset(0f, 6f))
             drawCircle(color, radius, pos)
             drawCircle(if (p.id == start.you) Color.White else Color.Black.copy(alpha = 0.6f), radius, pos, style = Stroke(4f))
@@ -122,7 +145,11 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
             val barW = 70f
             val barTop = pos.y - radius - 22f
             drawRoundRect(Color.Black.copy(alpha = 0.6f), Offset(pos.x - barW / 2 - 2, barTop - 2), Size(barW + 4, 12f), CornerRadius(4f))
-            val hpColor = if (p.id == start.you) Color(0xFF66BB6A) else Color(0xFFEF5350)
+            val hpColor = when {
+                p.id == start.you -> Color(0xFF66BB6A)
+                isAlly(p.tm) -> Color(0xFF42A5F5)
+                else -> Color(0xFFEF5350)
+            }
             drawRoundRect(hpColor, Offset(pos.x - barW / 2, barTop), Size(barW * p.hp / p.maxHp, 8f), CornerRadius(3f))
             drawContext.canvas.nativeCanvas.drawText(p.name, pos.x, barTop - 8f, paints.name)
 
@@ -137,6 +164,15 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
             }
         }
 
+        cur.ball?.let { b ->
+            val q = prev?.ball ?: b
+            val pos = if (b.h != null) Offset(b.x, b.y) else Offset(lerp(q.x, b.x, t), lerp(q.y, b.y, t))
+            drawCircle(Color.Black.copy(alpha = 0.3f), b.r, pos + Offset(0f, 6f))
+            drawCircle(Color.White, b.r, pos)
+            drawCircle(Color(0xFF263238), b.r * 0.4f, pos)
+            drawCircle(Color(0xFF263238), b.r, pos, style = Stroke(3f))
+        }
+
         // Bushes on top so they hide whoever stands inside; see-through around your own fighter.
         for (r in r0..r1) for (c in c0..c1) {
             if (map.tileAt(c, r) != 'b') continue
@@ -146,7 +182,7 @@ fun DrawScope.drawArena(conn: ArenaConnection, start: StartMsg, controls: TouchC
         }
     }
 
-    drawHud(cur.left, me, cur, controls, paints)
+    drawHud(cur.left, me, cur, controls, paints, start)
 }
 
 private fun DrawScope.drawHud(
@@ -155,6 +191,7 @@ private fun DrawScope.drawHud(
     cur: com.fightingarena.app.arena.StateMsg,
     controls: TouchControls,
     paints: ArenaPaints,
+    start: StartMsg,
 ) {
     val canvas = drawContext.canvas.nativeCanvas
     val unit = size.height / 360f
@@ -164,8 +201,31 @@ private fun DrawScope.drawHud(
     paints.hud.textAlign = Paint.Align.CENTER
     canvas.drawText("%d:%02d".format(secs / 60, secs % 60), size.width / 2, 26f * unit, paints.hud)
 
+    cur.score?.let { score ->
+        paints.hud.textSize = 22f * unit
+        paints.hud.color = TEAM_COLORS[0].toArgb()
+        canvas.drawText("${score[0]}", size.width / 2 - 34f * unit, 52f * unit, paints.hud)
+        paints.hud.color = android.graphics.Color.WHITE
+        canvas.drawText(":", size.width / 2, 52f * unit, paints.hud)
+        paints.hud.color = TEAM_COLORS[1].toArgb()
+        canvas.drawText("${score[1]}", size.width / 2 + 34f * unit, 52f * unit, paints.hud)
+        paints.hud.color = android.graphics.Color.WHITE
+        paints.hud.textSize = 18f * unit
+    }
+
     paints.hud.textAlign = Paint.Align.LEFT
     canvas.drawText("Убийства: ${me?.k ?: 0}", 16f * unit, 26f * unit, paints.hud)
+
+    cur.goal?.let { g ->
+        paints.hud.textAlign = Paint.Align.CENTER
+        paints.hud.textSize = 40f * unit
+        paints.hud.color = TEAM_COLORS[g.team.coerceIn(0, 1)].toArgb()
+        canvas.drawText("ГОЛ!", size.width / 2, size.height * 0.4f, paints.hud)
+        paints.hud.color = android.graphics.Color.WHITE
+        paints.hud.textSize = 16f * unit
+        if (g.scorer.isNotEmpty()) canvas.drawText(g.scorer, size.width / 2, size.height * 0.4f + 26f * unit, paints.hud)
+        paints.hud.textSize = 18f * unit
+    }
 
     paints.hud.textAlign = Paint.Align.RIGHT
     paints.hud.textSize = 12f * unit

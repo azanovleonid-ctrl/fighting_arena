@@ -30,6 +30,7 @@ data class Settings(
     val theme: String = "dark",
     val sound: Boolean = true,
     val vibration: Boolean = true,
+    val weapon: String = "rifle",
 )
 
 @Serializable
@@ -49,6 +50,8 @@ data class Profile(
 @Serializable
 data class MatchSummary(
     val id: String,
+    val mode: String = "brawl",
+    val goals: Int = 0,
     val place: Int,
     val players: Int,
     val kills: Int,

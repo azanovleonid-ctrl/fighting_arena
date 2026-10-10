@@ -26,7 +26,7 @@ sealed interface Phase {
  * One arena session. Snapshots are kept in plain fields, not Compose state, because the
  * render loop reads them every frame and they arrive ~30 times a second.
  */
-class ArenaConnection(token: String) {
+class ArenaConnection(token: String, private val mode: String, private val weapon: String) {
     private val _phase = MutableStateFlow<Phase>(Phase.Connecting)
     val phase: StateFlow<Phase> = _phase
 
@@ -49,7 +49,7 @@ class ArenaConnection(token: String) {
         previous = null
         current = null
         _phase.value = Phase.Queued
-        send("""{"t":"play"}""")
+        send("""{"t":"play","mode":"$mode","weapon":"$weapon"}""")
     }
 
     fun move(x: Float, y: Float) = send("""{"t":"move","mx":$x,"my":$y}""")
