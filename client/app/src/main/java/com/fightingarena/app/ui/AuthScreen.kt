@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -50,8 +53,8 @@ fun AuthScreen(app: ArenaApp) {
     }
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp).imePadding(),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("Арена бойцов", style = MaterialTheme.typography.headlineLarge)
@@ -61,7 +64,7 @@ fun AuthScreen(app: ArenaApp) {
             onValueChange = { username = it },
             label = { Text("Имя бойца") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
         )
         OutlinedTextField(
             value = password,
@@ -70,16 +73,13 @@ fun AuthScreen(app: ArenaApp) {
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
         )
-        if (registering) {
-            Text("Имя: 3–20 букв, цифр или _. Пароль: от 6 символов.", style = MaterialTheme.typography.bodySmall)
-        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Button(
             onClick = ::submit,
             enabled = !busy && username.isNotBlank() && password.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
         ) { Text(if (registering) "Зарегистрироваться" else "Войти") }
         TextButton(onClick = { registering = !registering; error = null }) {
             Text(if (registering) "Уже есть аккаунт? Войти" else "Нет аккаунта? Регистрация")

@@ -52,39 +52,50 @@ fun HomeScreen(app: ArenaApp, onFight: () -> Unit, onHistory: () -> Unit, onSett
     }
 
     Scaffold(topBar = { ArenaTopBar("Арена бойцов") }) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        // Landscape: character on the left, menu on the right.
+        Row(
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            profile?.let { p ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(p.username, style = MaterialTheme.typography.headlineSmall)
-                        Text("Уровень ${p.level} · здоровье ${p.maxHp}")
-                        LinearProgressIndicator(
-                            progress = { p.xp.toFloat() / p.xpToNextLevel },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Text("Опыт ${p.xp}/${p.xpToNextLevel}", style = MaterialTheme.typography.bodySmall)
-                        Text("Победы ${p.record.wins} · поражения ${p.record.losses} · ничьи ${p.record.draws}")
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                profile?.let { p ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(p.username, style = MaterialTheme.typography.headlineSmall)
+                            Text("Уровень ${p.level} · здоровье ${p.maxHp}")
+                            LinearProgressIndicator(
+                                progress = { p.xp.toFloat() / p.xpToNextLevel },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text("Опыт ${p.xp}/${p.xpToNextLevel}", style = MaterialTheme.typography.bodySmall)
+                            Text("Победы ${p.record.wins} · поражения ${p.record.losses} · ничьи ${p.record.draws}")
+                        }
                     }
-                }
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Характеристики", style = MaterialTheme.typography.titleMedium)
-                        if (p.freePoints > 0) Text("Свободных очков: ${p.freePoints}", color = MaterialTheme.colorScheme.secondary)
-                        StatRow("Сила", p.stats.strength, p.freePoints > 0) { spend(StatPoints(strength = 1)) }
-                        StatRow("Ловкость", p.stats.agility, p.freePoints > 0) { spend(StatPoints(agility = 1)) }
-                        StatRow("Интуиция", p.stats.intuition, p.freePoints > 0) { spend(StatPoints(intuition = 1)) }
-                        StatRow("Выносливость", p.stats.endurance, p.freePoints > 0) { spend(StatPoints(endurance = 1)) }
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Характеристики", style = MaterialTheme.typography.titleMedium)
+                            if (p.freePoints > 0) Text("Свободных очков: ${p.freePoints}", color = MaterialTheme.colorScheme.secondary)
+                            StatRow("Сила", p.stats.strength, p.freePoints > 0) { spend(StatPoints(strength = 1)) }
+                            StatRow("Ловкость", p.stats.agility, p.freePoints > 0) { spend(StatPoints(agility = 1)) }
+                            StatRow("Интуиция", p.stats.intuition, p.freePoints > 0) { spend(StatPoints(intuition = 1)) }
+                            StatRow("Выносливость", p.stats.endurance, p.freePoints > 0) { spend(StatPoints(endurance = 1)) }
+                        }
                     }
                 }
             }
-            Button(onClick = onFight, modifier = Modifier.fillMaxWidth()) { Text("В бой!") }
-            OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) { Text("История боёв") }
-            OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Настройки") }
-            TextButton(onClick = { scope.launch { app.session.signOut() } }) { Text("Выйти из аккаунта") }
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(onClick = onFight, modifier = Modifier.fillMaxWidth()) { Text("В бой!") }
+                OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) { Text("История боёв") }
+                OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Настройки") }
+                TextButton(onClick = { scope.launch { app.session.signOut() } }) { Text("Выйти из аккаунта") }
+            }
         }
     }
 }

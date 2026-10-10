@@ -4,15 +4,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -83,40 +85,43 @@ fun FightScreen(app: ArenaApp, fightId: String?, onExit: () -> Unit) {
             }
             return@Scaffold
         }
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                HpBar(f.player.name, f.player.hp, f.player.maxHp, Modifier.weight(1f))
-                HpBar(f.opponent.name, f.opponent.hp, f.opponent.maxHp, Modifier.weight(1f))
-            }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-
-            if (f.isActive) {
-                Text("Удар", style = MaterialTheme.typography.titleSmall)
-                ZoneChips(selected = listOfNotNull(attack)) { attack = it }
-                Text("Блок (2 зоны)", style = MaterialTheme.typography.titleSmall)
-                ZoneChips(selected = blocks) { z ->
-                    blocks = when {
-                        z in blocks -> blocks - z
-                        blocks.size < 2 -> blocks + z
-                        else -> listOf(blocks[1], z)
-                    }
+        Row(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(
+                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    HpBar(f.player.name, f.player.hp, f.player.maxHp, Modifier.weight(1f))
+                    HpBar(f.opponent.name, f.opponent.hp, f.opponent.maxHp, Modifier.weight(1f))
                 }
-                Button(
-                    onClick = { submit(f, Move(attack!!, blocks)) },
-                    enabled = !busy && attack != null && blocks.size == 2,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Ход") }
-            } else {
-                Text(
-                    "${resultTitle(f.result)}! Опыт +${f.xpGained}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Button(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("Готово") }
-            }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            HorizontalDivider()
-            RoundLog(f)
+                if (f.isActive) {
+                    Text("Удар", style = MaterialTheme.typography.titleSmall)
+                    ZoneChips(selected = listOfNotNull(attack)) { attack = it }
+                    Text("Блок", style = MaterialTheme.typography.titleSmall)
+                    ZoneChips(selected = blocks) { z ->
+                        blocks = when {
+                            z in blocks -> blocks - z
+                            blocks.size < 2 -> blocks + z
+                            else -> listOf(blocks[1], z)
+                        }
+                    }
+                    Button(
+                        onClick = { submit(f, Move(attack!!, blocks)) },
+                        enabled = !busy && attack != null && blocks.size == 2,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Ход") }
+                } else {
+                    Text(
+                        "${resultTitle(f.result)}! Опыт +${f.xpGained}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Button(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("Готово") }
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) { RoundLog(f) }
         }
     }
 }
