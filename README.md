@@ -3,7 +3,7 @@
 Клиент-серверная игра для Android: пошаговые бои, аккаунты, персональные настройки и история боёв.
 
 - `server/` — игровой сервер на Node.js + TypeScript (Fastify, PostgreSQL). Вся логика боя считается на сервере.
-- `client/` — Android-приложение (следующий этап).
+- `client/` — Android-приложение на Kotlin + Jetpack Compose: вход и регистрация, профиль, бой, история, настройки.
 
 ## Правила боя
 
@@ -55,3 +55,15 @@ npm test        # тесты используют TEST_DATABASE_URL (по умо
 4. Для продакшена поставьте перед сервером HTTPS (например, Caddy или Application Load Balancer с сертификатом из Certificate Manager).
 
 Чтобы использовать Managed Service for PostgreSQL вместо базы в Docker, уберите сервис `db` из `docker-compose.yml` и укажите строку подключения к кластеру в `DATABASE_URL`.
+
+## Android-приложение
+
+APK для отладки собирается в CI (артефакт `arena-debug-apk` у каждого запуска). Локально нужен Android Studio или Android SDK и JDK 17:
+
+```bash
+cd client
+./gradlew assembleDebug                                        # сервер по адресу эмулятора http://10.0.2.2:3000/
+./gradlew assembleDebug -PapiBaseUrl=http://<IP-сервера>:3000/  # для телефона и сервера в Yandex Cloud
+```
+
+Пока сервер работает по HTTP, приложение разрешает незашифрованные запросы (`res/xml/network_security_config.xml`). После подключения HTTPS это разрешение нужно убрать.
