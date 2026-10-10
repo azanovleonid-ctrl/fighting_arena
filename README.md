@@ -62,8 +62,8 @@ APK для отладки собирается в CI (артефакт `arena-de
 
 ```bash
 cd client
-./gradlew assembleDebug                                        # сервер по адресу эмулятора http://10.0.2.2:3000/
-./gradlew assembleDebug -PapiBaseUrl=http://<IP-сервера>:3000/  # для телефона и сервера в Yandex Cloud
+./gradlew assembleDebug                                        # сервер в Yandex Cloud (адрес в gradle.properties)
+./gradlew assembleDebug -PapiBaseUrl=http://10.0.2.2:3000/      # эмулятор и сервер на этом же компьютере
 ```
 
 Пока сервер работает по HTTP, приложение разрешает незашифрованные запросы (`res/xml/network_security_config.xml`). После подключения HTTPS это разрешение нужно убрать.
