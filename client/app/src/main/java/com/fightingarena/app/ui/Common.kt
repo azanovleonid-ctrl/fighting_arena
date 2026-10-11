@@ -21,11 +21,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.fightingarena.app.data.UpdateState
-import kotlinx.coroutines.launch
 import com.fightingarena.app.ArenaApp
 import com.fightingarena.app.data.isUnauthorized
 import com.fightingarena.app.data.userMessage
@@ -53,7 +51,6 @@ fun Result<*>.errorText(): String? = exceptionOrNull()?.userMessage()
 @Composable
 fun UpdateBanner(app: ArenaApp) {
     val state by app.updater.state.collectAsState()
-    val scope = rememberCoroutineScope()
     val info = when (val s = state) {
         is UpdateState.Available -> s.info
         is UpdateState.Downloading -> s.info
@@ -67,9 +64,10 @@ fun UpdateBanner(app: ArenaApp) {
             Text("Новая версия ${info.versionName}", Modifier.weight(1f))
             val s = state
             if (s is UpdateState.Downloading) {
-                LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.weight(1f))
+                if (s.progress >= 0f) LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.weight(1f))
+                else LinearProgressIndicator(Modifier.weight(1f))
             } else {
-                Button(onClick = { scope.launch { app.updater.install(info) } }) { Text("Обновить") }
+                Button(onClick = { app.updater.install(info) }) { Text("Обновить") }
             }
         }
     }
