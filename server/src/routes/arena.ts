@@ -35,7 +35,7 @@ export async function arenaRoutes(app: FastifyInstance, opts: { arena: Arena }) 
       },
     };
     socket.on("message", (raw) => {
-      let msg: { t?: unknown; mode?: unknown; brawler?: unknown };
+      let msg: { t?: unknown; mode?: unknown; brawler?: unknown; together?: unknown; code?: unknown };
       try {
         msg = JSON.parse(raw.toString());
       } catch {
@@ -44,6 +44,13 @@ export async function arenaRoutes(app: FastifyInstance, opts: { arena: Arena }) 
       if (msg.t === "play") {
         if (isBrawler(msg.brawler)) client.brawler = msg.brawler;
         arena.join(client, isMode(msg.mode) ? msg.mode : settings.mode);
+      }
+      else if (msg.t === "party_create") {
+        if (isBrawler(msg.brawler)) client.brawler = msg.brawler;
+        arena.createParty(client, isMode(msg.mode) ? msg.mode : settings.mode, msg.together === true);
+      } else if (msg.t === "party_join") {
+        if (isBrawler(msg.brawler)) client.brawler = msg.brawler;
+        arena.joinParty(client, String(msg.code ?? "").trim());
       }
       else if (msg.t === "leave") arena.leave(client);
       else if (msg.t === "ping") client.send({ t: "pong", c: (msg as { c?: unknown }).c });

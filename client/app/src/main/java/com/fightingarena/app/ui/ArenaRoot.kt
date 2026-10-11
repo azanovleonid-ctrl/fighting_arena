@@ -21,6 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.fightingarena.app.ArenaApp
+import com.fightingarena.app.arena.PartyRequest
 
 private val Dark = darkColorScheme(primary = Color(0xFFE5533D), secondary = Color(0xFFF2B33D))
 private val Light = lightColorScheme(primary = Color(0xFFB8321F), secondary = Color(0xFFB07A10))
@@ -54,12 +55,20 @@ private fun MainNav(app: ArenaApp) {
             HomeScreen(
                 app,
                 onFight = { mode -> nav.navigate("fight/$mode") },
+                onCreateParty = { mode, together -> nav.navigate("party/$mode/create/${if (together) 1 else 0}") },
+                onJoinParty = { mode, code -> nav.navigate("party/$mode/join/$code") },
                 onHistory = { nav.navigate("history") },
                 onSettings = { nav.navigate("settings") },
             )
         }
         composable("fight/{mode}") { entry ->
             GameScreen(app, mode = entry.arguments?.getString("mode") ?: "survival", onExit = { nav.popBackStack() })
+        }
+        composable("party/{mode}/{kind}/{arg}") { entry ->
+            val args = entry.arguments
+            val arg = args?.getString("arg").orEmpty()
+            val party = if (args?.getString("kind") == "join") PartyRequest.Join(arg) else PartyRequest.Create(arg == "1")
+            GameScreen(app, mode = args?.getString("mode") ?: "survival", party = party, onExit = { nav.popBackStack() })
         }
         composable("history") { HistoryScreen(app, onBack = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(app, onBack = { nav.popBackStack() }) }

@@ -78,6 +78,50 @@ describe("arena", () => {
     expect(code).toBe(4401);
   });
 
+  it("lets two friends play by a room code, together or against each other", async () => {
+    const tokens = [await register("party_host"), await register("party_guest")];
+    // Opens both sockets and returns a helper that waits for a message type on each.
+    const connect = async (token: string) => {
+      const ws = new WebSocket(`${wsUrl()}?token=${token}`);
+      const inbox: any[] = [];
+      const waiters: [string, (m: any) => void][] = [];
+      ws.addEventListener("message", (e) => {
+        const msg = JSON.parse(String(e.data));
+        const i = waiters.findIndex(([t]) => t === msg.t);
+        if (i >= 0) waiters.splice(i, 1)[0][1](msg);
+        else inbox.push(msg);
+      });
+      const next = (t: string) =>
+        new Promise<any>((resolve) => {
+          const i = inbox.findIndex((m) => m.t === t);
+          if (i >= 0) resolve(inbox.splice(i, 1)[0]);
+          else waiters.push([t, resolve]);
+        });
+      await next("hello");
+      return { ws, next, send: (m: unknown) => ws.send(JSON.stringify(m)) };
+    };
+    const host = await connect(tokens[0]);
+    const guest = await connect(tokens[1]);
+
+    guest.send({ t: "party_join", code: "0000", brawler: "spark" });
+    expect((await guest.next("party_error")).message).toMatch(/не найдена/);
+
+    for (const together of [true, false]) {
+      host.send({ t: "party_create", mode: "ball", brawler: "hammer", together });
+      const party = await host.next("party");
+      expect(party.code).toMatch(/^\d{4}$/);
+      guest.send({ t: "party_join", code: party.code, brawler: "spark" });
+      const [a, b] = await Promise.all([host.next("start"), guest.next("start")]);
+      expect(a.brawler).toBe("hammer");
+      expect(b.brawler).toBe("spark");
+      expect(a.team === b.team).toBe(together);
+      host.send({ t: "leave" });
+      guest.send({ t: "leave" });
+    }
+    host.ws.close();
+    guest.ws.close();
+  });
+
   it("plays a full ball match against bots and saves the result", async () => {
     const token = await register("arena_player");
     const ws = new WebSocket(`${wsUrl()}?token=${token}`);

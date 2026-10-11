@@ -22,13 +22,26 @@ sealed interface Phase {
     data class Playing(val start: StartMsg) : Phase
     data class Ended(val end: EndMsg) : Phase
     data class Failed(val message: String) : Phase
+    /** Waiting in a private room for a friend to join with [code]. */
+    data class Party(val code: String, val together: Boolean) : Phase
+}
+
+/** Playing with a friend: open a room and get a code, or join one by its code. */
+sealed interface PartyRequest {
+    data class Create(val together: Boolean) : PartyRequest
+    data class Join(val code: String) : PartyRequest
 }
 
 /**
  * One arena session. Snapshots are kept in plain fields, not Compose state, because the
  * render loop reads them every frame and they arrive ~30 times a second.
  */
-class ArenaConnection(token: String, private val mode: String, private val brawler: String) {
+class ArenaConnection(
+    token: String,
+    private val mode: String,
+    private val brawler: String,
+    val party: PartyRequest? = null,
+) {
     private val _phase = MutableStateFlow<Phase>(Phase.Connecting)
     val phase: StateFlow<Phase> = _phase
 
@@ -117,6 +130,15 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
     fun fire(ax: Float, ay: Float) = send("""{"t":"fire","ax":$ax,"ay":$ay}""")
     fun superAttack(ax: Float, ay: Float) = send("""{"t":"super","ax":$ax,"ay":$ay}""")
 
+    private fun openParty(request: PartyRequest) {
+        when (request) {
+            is PartyRequest.Create ->
+                send("""{"t":"party_create","mode":"$mode","brawler":"$brawler","together":${request.together}}""")
+            is PartyRequest.Join ->
+                send("""{"t":"party_join","code":"${request.code.filter { it.isDigit() }}","brawler":"$brawler"}""")
+        }
+    }
+
     fun close() {
         socket.close(1000, null)
     }
@@ -129,7 +151,12 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
         override fun onMessage(webSocket: WebSocket, text: String) {
             val obj = runCatching { json.parseToJsonElement(text) as JsonObject }.getOrNull() ?: return
             when (obj["t"]?.jsonPrimitive?.content) {
-                "hello" -> playAgain()
+                "hello" -> if (party == null) playAgain() else openParty(party)
+                "party" -> _phase.value = Phase.Party(
+                    obj["code"]?.jsonPrimitive?.content.orEmpty(),
+                    obj["together"]?.jsonPrimitive?.content == "true",
+                )
+                "party_error" -> _phase.value = Phase.Failed(obj["message"]?.jsonPrimitive?.content ?: "Не получилось")
                 "queued" -> _phase.value = Phase.Queued
                 "start" -> _phase.value = Phase.Playing(json.decodeFromJsonElement(StartMsg.serializer(), obj))
                 "state" -> receive(json.decodeFromJsonElement(StateMsg.serializer(), obj))

@@ -50,6 +50,18 @@ interface Room {
   timer: NodeJS.Timeout | null;
 }
 
+/** A private room for playing with a friend: the host gets a code, the friend joins with it. */
+interface Party {
+  code: string;
+  mode: Mode;
+  /** Same team, or against each other (survival is always against). */
+  together: boolean;
+  host: Client;
+  timer: NodeJS.Timeout;
+}
+
+const PARTY_TTL_MS = 15 * 60_000;
+
 interface Queue {
   clients: Client[];
   timer: NodeJS.Timeout | null;
@@ -59,11 +71,12 @@ export class Arena {
   private queues = new Map<Mode, Queue>(MODES.map((m) => [m, { clients: [], timer: null }]));
   private roomOf = new Map<Client, Room>();
   private rooms = new Set<Room>();
+  private parties = new Map<string, Party>();
 
   constructor(private readonly opts: ArenaOptions) {}
 
   join(client: Client, mode: Mode) {
-    if (this.roomOf.has(client) || this.queueOf(client)) return;
+    if (this.roomOf.has(client) || this.queueOf(client) || this.partyOf(client)) return;
     const q = this.queues.get(mode)!;
     q.clients.push(client);
     client.send({ t: "queued", mode, players: q.clients.length });
@@ -71,7 +84,43 @@ export class Arena {
     else if (!q.timer) q.timer = setTimeout(() => this.startMatch(mode), this.opts.queueWaitMs);
   }
 
+  /** Opens a private room and sends its code; the match starts when a friend joins with it. */
+  createParty(client: Client, mode: Mode, together: boolean) {
+    if (this.roomOf.has(client) || this.queueOf(client) || this.partyOf(client)) return;
+    let code: string;
+    do code = String(1000 + Math.floor(Math.random() * 9000));
+    while (this.parties.has(code));
+    const party: Party = {
+      code,
+      mode,
+      together: together && mode !== "survival",
+      host: client,
+      timer: setTimeout(() => this.closeParty(code, "Друг не подключился, комната закрыта"), PARTY_TTL_MS),
+    };
+    this.parties.set(code, party);
+    client.send({ t: "party", code, mode, together: party.together });
+  }
+
+  /** Joins a friend's room by its code and starts the match for both. */
+  joinParty(client: Client, code: string) {
+    if (this.roomOf.has(client) || this.queueOf(client) || this.partyOf(client)) return;
+    const party = this.parties.get(code);
+    if (!party) {
+      client.send({ t: "party_error", message: "Комната с таким кодом не найдена" });
+      return;
+    }
+    clearTimeout(party.timer);
+    this.parties.delete(code);
+    const { teams } = MODE_RULES[party.mode];
+    this.launch(party.mode, [
+      { client: party.host, team: 0 },
+      { client, team: party.together ? 0 : Math.min(1, teams - 1) },
+    ]);
+  }
+
   leave(client: Client) {
+    const party = this.partyOf(client);
+    if (party) this.closeParty(party.code, null);
     for (const q of this.queues.values()) q.clients = q.clients.filter((c) => c !== client);
     const room = this.roomOf.get(client);
     if (!room) return;
@@ -97,7 +146,21 @@ export class Arena {
   shutdown() {
     for (const q of this.queues.values()) if (q.timer) clearTimeout(q.timer);
     for (const room of this.rooms) if (room.timer) clearTimeout(room.timer);
+    for (const party of this.parties.values()) clearTimeout(party.timer);
+    this.parties.clear();
     this.rooms.clear();
+  }
+
+  private partyOf(client: Client) {
+    return [...this.parties.values()].find((p) => p.host === client);
+  }
+
+  private closeParty(code: string, message: string | null) {
+    const party = this.parties.get(code);
+    if (!party) return;
+    clearTimeout(party.timer);
+    this.parties.delete(code);
+    if (message) party.host.send({ t: "party_error", message });
   }
 
   private queueOf(client: Client) {
@@ -113,17 +176,22 @@ export class Arena {
     if (humans.length === 0) return;
     if (q.clients.length > 0) q.timer = setTimeout(() => this.startMatch(mode), this.opts.queueWaitMs);
 
+    // Humans are spread over the teams first; bots fill the free places.
+    this.launch(mode, humans.map((client, i) => ({ client, team: i % teams })));
+  }
+
+  /** Starts a match with these humans on the given teams; bots take the free places. */
+  private launch(mode: Mode, humans: { client: Client; team: number }[]) {
+    const { players: size, teams } = MODE_RULES[mode];
     const match = new Match(mode, this.opts.durationMs ?? MODE_RULES[mode].durationMs, this.opts.rng);
     const members = new Map<Client, number>();
     const perTeam = size / teams;
     const teamSizes = Array.from({ length: teams }, () => 0);
-    // Humans are spread over the teams first; bots fill the free places.
-    humans.forEach((c, i) => {
-      const team = i % teams;
+    for (const { client: c, team } of humans) {
       teamSizes[team]++;
       members.set(c, match.addPlayer(c.name, c.brawler, c.level, c.userId, team).id);
-    });
-    const names = BOT_NAMES.filter((n) => !humans.some((h) => h.name === n));
+    }
+    const names = BOT_NAMES.filter((n) => !humans.some((h) => h.client.name === n));
     for (let i = humans.length; i < size; i++) {
       const team = teamSizes.findIndex((n) => n < perTeam);
       teamSizes[team]++;

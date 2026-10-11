@@ -17,6 +17,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardType
+import com.fightingarena.app.data.modeName
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -48,9 +55,17 @@ import com.fightingarena.app.data.brawler
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(app: ArenaApp, onFight: (mode: String) -> Unit, onHistory: () -> Unit, onSettings: () -> Unit) {
+fun HomeScreen(
+    app: ArenaApp,
+    onFight: (mode: String) -> Unit,
+    onCreateParty: (mode: String, together: Boolean) -> Unit,
+    onJoinParty: (mode: String, code: String) -> Unit,
+    onHistory: () -> Unit,
+    onSettings: () -> Unit,
+) {
     val profile by app.session.profile.collectAsState()
     var error by remember { mutableStateOf<String?>(null) }
+    var friendDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Refresh on every visit so the record is current after a fight.
@@ -110,8 +125,21 @@ fun HomeScreen(app: ArenaApp, onFight: (mode: String) -> Unit, onHistory: () -> 
             }
         }
         Spacer(Modifier.weight(1f))
-        Button(onClick = { onFight(settings.mode) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("В бой", style = MaterialTheme.typography.titleLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(onClick = { onFight(settings.mode) }, modifier = Modifier.weight(1.6f).height(56.dp)) {
+                Text("В бой", style = MaterialTheme.typography.titleLarge)
+            }
+            OutlinedButton(onClick = { friendDialog = true }, modifier = Modifier.weight(1f).height(56.dp)) {
+                Text("С другом")
+            }
+        }
+        if (friendDialog) {
+            FriendDialog(
+                mode = settings.mode,
+                onCreate = { together -> friendDialog = false; onCreateParty(settings.mode, together) },
+                onJoin = { code -> friendDialog = false; onJoinParty(settings.mode, code) },
+                onDismiss = { friendDialog = false },
+            )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick = onHistory, modifier = Modifier.weight(1f)) { Text("История") }
@@ -178,4 +206,43 @@ private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick
             Text(m.about, style = MaterialTheme.typography.labelSmall)
         }
     }
+}
+
+/** Play with a friend: open a room and share its code, or join a friend's room by code. */
+@Composable
+private fun FriendDialog(mode: String, onCreate: (Boolean) -> Unit, onJoin: (String) -> Unit, onDismiss: () -> Unit) {
+    var together by remember { mutableStateOf(mode != "survival") }
+    var code by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Игра с другом") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Режим: ${modeName(mode)}", style = MaterialTheme.typography.bodyMedium)
+                if (mode == "survival") {
+                    Text("В выживании каждый сам за себя, поэтому вы будете друг против друга.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = together, onClick = { together = true }, label = { Text("Вместе") })
+                        FilterChip(selected = !together, onClick = { together = false }, label = { Text("Друг против друга") })
+                    }
+                }
+                Button(onClick = { onCreate(together) }, modifier = Modifier.fillMaxWidth()) { Text("Создать комнату") }
+                HorizontalDivider()
+                Text("Друг уже создал комнату?", style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it.filter(Char::isDigit).take(4) },
+                        label = { Text("Код") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(onClick = { onJoin(code) }, enabled = code.length == 4) { Text("Войти") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
+    )
 }

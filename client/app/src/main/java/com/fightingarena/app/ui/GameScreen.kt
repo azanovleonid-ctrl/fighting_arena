@@ -41,19 +41,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fightingarena.app.ArenaApp
 import com.fightingarena.app.arena.ArenaConnection
 import com.fightingarena.app.arena.EndMsg
+import com.fightingarena.app.arena.PartyRequest
 import com.fightingarena.app.arena.Phase
 import com.fightingarena.app.arena.StartMsg
 import com.fightingarena.app.data.brawler
 import com.fightingarena.app.data.modeName
 
 @Composable
-fun GameScreen(app: ArenaApp, mode: String, onExit: () -> Unit) {
+fun GameScreen(app: ArenaApp, mode: String, party: PartyRequest? = null, onExit: () -> Unit) {
     val brawler = app.session.profile.value?.settings?.brawler ?: "spark"
-    val conn = remember { ArenaConnection(app.session.token.orEmpty(), mode, brawler) }
+    val conn = remember { ArenaConnection(app.session.token.orEmpty(), mode, brawler, party) }
     DisposableEffect(conn) { onDispose { conn.close() } }
     val phase by conn.phase.collectAsState()
     val profile by app.session.profile.collectAsState()
@@ -65,8 +67,25 @@ fun GameScreen(app: ArenaApp, mode: String, onExit: () -> Unit) {
             Text("Ищем бой…", style = MaterialTheme.typography.titleMedium)
             OutlinedButton(onClick = onExit) { Text("Отмена") }
         }
+        is Phase.Party -> Centered {
+            Text("Комната для друга", style = MaterialTheme.typography.titleMedium)
+            Text(p.code, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+            Text(
+                "Скажите другу этот код. Он нажимает «С другом», вводит код и жмёт «Войти».",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            Text(
+                "${modeName(mode)} · " + if (p.together) "вы в одной команде" else "вы друг против друга",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            CircularProgressIndicator()
+            OutlinedButton(onClick = onExit) { Text("Отмена") }
+        }
         is Phase.Playing -> ArenaView(conn, p.start, vibration = profile?.settings?.vibration != false)
-        is Phase.Ended -> ResultsView(p.end, onAgain = conn::playAgain, onExit = onExit)
+        // A friend's room is single-use: "again" is offered only for normal matchmaking.
+        is Phase.Ended -> ResultsView(p.end, onAgain = if (party == null) conn::playAgain else null, onExit = onExit)
         is Phase.Failed -> Centered {
             Text(p.message, color = MaterialTheme.colorScheme.error)
             Button(onClick = onExit) { Text("В меню") }
@@ -137,7 +156,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
 }
 
 @Composable
-private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
+private fun ResultsView(end: EndMsg, onAgain: (() -> Unit)?, onExit: () -> Unit) {
     val teamMode = end.mode == "ball" || end.mode == "beacon"
     // Portrait, fits on one screen: at most 6 rows in the table.
     Column(
@@ -194,7 +213,7 @@ private fun ResultsView(end: EndMsg, onAgain: () -> Unit, onExit: () -> Unit) {
             }
         }
         Spacer(Modifier.weight(1f))
-        Button(onClick = onAgain, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Ещё бой", style = MaterialTheme.typography.titleLarge) }
+        onAgain?.let { Button(onClick = it, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Ещё бой", style = MaterialTheme.typography.titleLarge) } }
         OutlinedButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("В меню") }
     }
 }
