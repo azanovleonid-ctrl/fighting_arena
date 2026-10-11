@@ -113,6 +113,7 @@ class ArenaConnection(token: String, private val mode: String, private val brawl
     }
 
     fun move(x: Float, y: Float) = send("""{"t":"move","mx":$x,"my":$y}""")
+    fun move(x: Float, y: Float, seq: Int) = send("""{"t":"move","mx":$x,"my":$y,"s":$seq}""")
     fun fire(ax: Float, ay: Float) = send("""{"t":"fire","ax":$ax,"ay":$ay}""")
     fun superAttack(ax: Float, ay: Float) = send("""{"t":"super","ax":$ax,"ay":$ay}""")
 

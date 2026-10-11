@@ -109,8 +109,8 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
                 if (frame != 0L && now > frame) fps[0] = fps[0] * 0.95f + 0.05f * (1e9f / (now - frame))
                 frame = now
                 conn.maybePing(now)
-                controls.flushMove(conn, now)
-                predictor.update(now, conn.latest, start.you, controls.moveVector(), speed)
+                if (!predictor.numbered) controls.flushMove(conn, now)
+                predictor.update(now, conn.latest, start.you, controls.moveVector(), speed, conn)
                 local.step(now, conn.latest, predictor.pos)
                 controls.holdFire()
                 val me = conn.latest?.players?.find { it.id == start.you }

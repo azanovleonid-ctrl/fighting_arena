@@ -53,6 +53,8 @@ data class MeSnap(
     val respawnIn: Long = 0,
     val out: Boolean = false,
     val follow: Int? = null,
+    /** Last numbered move the server applied; null from servers without numbered moves. */
+    val ack: Int? = null,
 )
 
 @Serializable

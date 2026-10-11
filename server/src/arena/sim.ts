@@ -63,6 +63,9 @@ export const BEACON_RATE = 0.025; // share of the bar per second of clean hold
 const HAMMER_ARC = 0.95;
 const JUMP = { range: 520, ms: 500, damage: 1700, radius: 130, knock: 70 };
 const SPARK = { pellets: 5, step: 0.11 };
+/** Numbered moves kept waiting at most, and applied per tick at most. */
+const MAX_QUEUED_MOVES = 8;
+const MAX_MOVES_PER_TICK = 3;
 const DASH = { ms: 300, speed: 1350, damage: 1300, knock: 90 };
 const BOOMER_SUPER = { spread: 0.3, range: 560, damage: 700 };
 const TINKER = { offset: 0.05 };
@@ -93,6 +96,11 @@ export interface Player {
   facing: number;
   moveX: number;
   moveY: number;
+  /** Numbered moves from the phone, one per tick each (see queueMove). */
+  inputs: [number, number, number][];
+  /** Number of the last numbered move applied, sent back so the phone can replay the rest. */
+  ack: number;
+  inputBank: number;
   hp: number;
   maxHp: number;
   ammo: number;
@@ -337,6 +345,9 @@ export class Match {
       facing: 0,
       moveX: 0,
       moveY: 0,
+      inputs: [],
+      ack: -1,
+      inputBank: 0,
       hp: 0,
       maxHp: 0,
       ammo: AMMO_MAX,
@@ -387,6 +398,26 @@ export class Match {
     const len = Math.hypot(mx, my);
     p.moveX = len > 1 ? mx / len : mx;
     p.moveY = len > 1 ? my / len : my;
+  }
+
+  /**
+   * A numbered move: the phone sends one per tick while walking and moves itself by the same step, so
+   * each one moves the brawler exactly one tick here. Moves that can't walk (jump, dash, pause, knocked
+   * out) are confirmed without moving, so the phone drops them too.
+   */
+  queueMove(id: number, mx: number, my: number, seq: number) {
+    const p = this.players.get(id);
+    if (!p || !Number.isFinite(mx) || !Number.isFinite(my) || !Number.isInteger(seq) || seq <= p.ack) return;
+    const len = Math.hypot(mx, my);
+    const x = len > 1 ? mx / len : mx;
+    const y = len > 1 ? my / len : my;
+    if (!p.alive || p.jump || p.dash || this.isPaused) {
+      p.inputs.length = 0;
+      p.ack = seq;
+      return;
+    }
+    p.inputs.push([x, y, seq]);
+    if (p.inputs.length > MAX_QUEUED_MOVES) p.inputs.shift();
   }
 
   /**
@@ -864,6 +895,10 @@ export class Match {
   // ---- movement ----
 
   private movePlayer(p: Player, dt: number) {
+    if ((p.jump || p.dash) && p.inputs.length) {
+      p.ack = p.inputs[p.inputs.length - 1][2];
+      p.inputs.length = 0;
+    }
     if (p.jump) {
       const j = p.jump;
       const k = Math.min(1, (this.time - j.start) / (j.end - j.start));
@@ -891,6 +926,23 @@ export class Match {
       if (blocked || this.time >= d.end) p.dash = null;
       return;
     }
+    if (p.inputs.length || p.ack >= 0) {
+      // Up to a few queued moves per tick, so a late packet catches up but walking can't speed up.
+      p.inputBank = Math.min(p.inputBank + 1, MAX_MOVES_PER_TICK);
+      while (p.inputs.length && p.inputBank >= 1) {
+        const [x, y, seq] = p.inputs.shift()!;
+        p.inputBank -= 1;
+        p.ack = seq;
+        p.moveX = x;
+        p.moveY = y;
+        this.walk(p, dt);
+      }
+      return;
+    }
+    this.walk(p, dt);
+  }
+
+  private walk(p: Player, dt: number) {
     if (!p.moveX && !p.moveY) return;
     let speed = p.brawler.speed;
     if (this.time < p.slowUntil) speed *= SLOW_FACTOR;
@@ -1216,7 +1268,7 @@ export class Match {
     // Kick-off: everyone back to the start, full health.
     for (const p of this.players.values()) {
       const s = this.startPosition(p);
-      Object.assign(p, { x: s.x, y: s.y, alive: true, ammo: AMMO_MAX, moveX: 0, moveY: 0, jump: null, dash: null, burst: null, slowUntil: 0 });
+      Object.assign(p, { x: s.x, y: s.y, alive: true, ammo: AMMO_MAX, moveX: 0, moveY: 0, inputs: [], inputBank: 0, jump: null, dash: null, burst: null, slowUntil: 0 });
       p.hp = p.maxHp;
     }
   }

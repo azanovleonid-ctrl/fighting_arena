@@ -47,7 +47,7 @@ const BOT_NAMES = ["Громила", "Тень", "Бешеный Пёс", "Ку�
 interface Room {
   match: Match;
   members: Map<Client, number>; // client -> player id, until their result is final
-  timer: NodeJS.Timeout;
+  timer: NodeJS.Timeout | null;
 }
 
 interface Queue {
@@ -82,18 +82,21 @@ export class Arena {
     if (room.members.size === 0) this.close(room);
   }
 
-  input(client: Client, msg: { t: string; mx?: number; my?: number; ax?: number; ay?: number }) {
+  input(client: Client, msg: { t: string; mx?: number; my?: number; ax?: number; ay?: number; s?: number }) {
     const room = this.roomOf.get(client);
     const id = room?.members.get(client);
     if (!room || id === undefined) return;
-    if (msg.t === "move") room.match.setMove(id, Number(msg.mx), Number(msg.my));
+    if (msg.t === "move") {
+      if (msg.s !== undefined) room.match.queueMove(id, Number(msg.mx), Number(msg.my), Number(msg.s));
+      else room.match.setMove(id, Number(msg.mx), Number(msg.my));
+    }
     else if (msg.t === "fire") room.match.fire(id, Number(msg.ax ?? 0), Number(msg.ay ?? 0));
     else if (msg.t === "super") room.match.useSuper(id, Number(msg.ax ?? 0), Number(msg.ay ?? 0));
   }
 
   shutdown() {
     for (const q of this.queues.values()) if (q.timer) clearTimeout(q.timer);
-    for (const room of this.rooms) clearInterval(room.timer);
+    for (const room of this.rooms) if (room.timer) clearTimeout(room.timer);
     this.rooms.clear();
   }
 
@@ -129,14 +132,29 @@ export class Arena {
       match.addPlayer(name, brawler, 1, null, team);
     }
 
-    const room: Room = { match, members, timer: setInterval(() => this.tick(room), this.opts.tickMs) };
+    const room: Room = { match, members, timer: null };
     this.rooms.add(room);
+    this.schedule(room, performance.now() + this.opts.tickMs);
     const map = { cols: match.map.cols, rows: match.map.rows, tile: TILE, layout: match.map.layout, playerRadius: PLAYER_RADIUS };
     for (const [c, id] of members) {
       this.roomOf.set(c, room);
       const p = match.players.get(id)!;
       c.send({ t: "start", mode, you: id, team: p.team, brawler: p.brawler.id, map, durationMs: match.durationMs, beaconRadius: BEACON_RADIUS });
     }
+  }
+
+  /**
+   * Runs ticks on a fixed beat: each one is aimed at its own due time, so late timers don't add up
+   * and the match clock keeps pace with real time (phones send one move per tick).
+   */
+  private schedule(room: Room, due: number) {
+    room.timer = setTimeout(() => {
+      if (!this.rooms.has(room)) return;
+      this.tick(room);
+      const now = performance.now();
+      const next = due + this.opts.tickMs < now - 100 ? now : due + this.opts.tickMs;
+      if (this.rooms.has(room)) this.schedule(room, next);
+    }, Math.max(0, due - performance.now()));
   }
 
   private tick(room: Room) {
@@ -153,7 +171,7 @@ export class Arena {
   }
 
   private close(room: Room) {
-    clearInterval(room.timer);
+    if (room.timer) clearTimeout(room.timer);
     this.rooms.delete(room);
   }
 
@@ -253,6 +271,7 @@ export function snapshot(match: Match, viewerId: number) {
     left: match.timeLeftMs,
     me: viewer && {
       ammo: r2(viewer.ammo),
+      ack: viewer.ack,
       sup: r2(viewer.superCharge),
       respawnIn: viewer.alive || viewer.out ? 0 : Math.max(0, viewer.respawnAt - t),
       out: viewer.out,

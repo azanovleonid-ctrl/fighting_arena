@@ -457,3 +457,30 @@ describe("bots", () => {
     expect(res.reduce((s, r) => s + r.damage, 0)).toBeGreaterThan(0);
   });
 });
+
+describe("numbered moves", () => {
+  it("move exactly one tick each and are confirmed, however they arrive", () => {
+    const { m, a } = duel("spark", "hammer");
+    const step = a.brawler.speed * 0.033;
+    const x0 = a.x;
+    for (let s = 1; s <= 5; s++) m.queueMove(a.id, 1, 0, s);
+    run(m, 330);
+    expect(a.x).toBeCloseTo(x0 + 5 * step, 3);
+    expect(a.ack).toBe(5);
+    // Late moves after a gap catch up within a tick or two, never faster than 3 a tick.
+    for (let s = 6; s <= 8; s++) m.queueMove(a.id, 1, 0, s);
+    m.step(33);
+    expect(a.ack).toBe(8);
+    expect(a.x).toBeCloseTo(x0 + 8 * step, 3);
+    for (let s = 9; s <= 16; s++) m.queueMove(a.id, 1, 0, s);
+    m.step(33);
+    expect(a.ack).toBeLessThanOrEqual(11);
+    run(m, 330);
+    expect(a.ack).toBe(16);
+    expect(a.x).toBeCloseTo(x0 + 16 * step, 3);
+    // Old numbers are ignored.
+    m.queueMove(a.id, 1, 0, 3);
+    run(m, 99);
+    expect(a.x).toBeCloseTo(x0 + 16 * step, 3);
+  });
+});
