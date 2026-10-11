@@ -29,6 +29,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -63,8 +65,29 @@ fun GameScreen(app: ArenaApp, mode: String, party: PartyRequest? = null, onExit:
 
     when (val p = phase) {
         Phase.Connecting, Phase.Queued -> Centered {
+            // A friend's room answers at once; a server without rooms never answers.
+            var slow by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                delay(6_000)
+                slow = true
+            }
             CircularProgressIndicator()
-            Text("Ищем бой…", style = MaterialTheme.typography.titleMedium)
+            Text(
+                when (party) {
+                    is PartyRequest.Create -> "Создаём комнату…"
+                    is PartyRequest.Join -> "Входим в комнату…"
+                    null -> "Ищем бой…"
+                },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (party != null && slow) {
+                Text(
+                    "Сервер не отвечает на игру с другом. Скорее всего, его нужно обновить командой с компьютера.",
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+            }
             OutlinedButton(onClick = onExit) { Text("Отмена") }
         }
         is Phase.Party -> Centered {
