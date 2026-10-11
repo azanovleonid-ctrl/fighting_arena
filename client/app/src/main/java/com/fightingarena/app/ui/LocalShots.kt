@@ -52,7 +52,8 @@ class LocalShots(private val start: StartMsg) {
     val bombs = mutableListOf<LocalBomb>()
     val slashes = mutableListOf<LocalSlash>()
     private val pending = mutableListOf<Pair<Long, Float>>() // Стрела's burst: when, angle
-    private var lastFireNanos = 0L
+    var lastFireNanos = 0L
+        private set
     private var lastStepNanos = 0L
     private val info = com.fightingarena.app.data.brawler(start.brawler)
 

@@ -243,16 +243,25 @@ fun DrawScope.drawArena(
                 else -> RED
             }
             val bear = p.b == "hammer"
-            if (bear) {
+            val bird = p.b == "spark"
+            if (bear || bird) {
                 val walk = paints.walks.getOrPut(p.id) { WalkState(base.x, base.y) }
                 walk.advance(base, p.f)
-                val swing = if (p.id == start.you) {
-                    local.slashes.lastOrNull()?.let { (nowNanos - it.bornNanos) / 300_000_000f }
+                if (bear) {
+                    val swing = if (p.id == start.you) {
+                        local.slashes.lastOrNull()?.let { (nowNanos - it.bornNanos) / 300_000_000f }
+                    } else {
+                        cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
+                            .minByOrNull { it.age }?.let { it.age / 300f }
+                    }
+                    drawBear(pos, walk, side, alpha, swing?.takeIf { it < 1f } ?: 0f)
                 } else {
-                    cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
-                        .minByOrNull { it.age }?.let { it.age / 300f }
+                    // Recoil right after a shot: own shots from the phone, others' from fresh pellets nearby.
+                    val recoil = if (p.id == start.you) {
+                        1f - (nowNanos - local.lastFireNanos) / 150_000_000f
+                    } else if (cur.shots.any { it.o == p.id && (Offset(it.x, it.y) - base).getDistance() < 80f }) 1f else 0f
+                    drawFirebird(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), (nowNanos % 60_000_000_000L) / 1e9f)
                 }
-                drawBear(pos, walk, side, alpha, swing?.takeIf { it < 1f } ?: 0f)
                 if (p.sl) drawCircle(Color(0xFF81D4FA).copy(alpha = 0.4f), r + 6f, pos - Offset(0f, 20f))
                 if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r + 24f, pos - Offset(0f, 20f), style = Stroke(5f))
             } else {
@@ -267,7 +276,7 @@ fun DrawScope.drawArena(
                 drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
             }
 
-            val barTop = if (bear) pos.y - 84f else pos.y - r - 22f
+            val barTop = if (bear || bird) pos.y - 84f else pos.y - r - 22f
             val hpColor = when {
                 p.id == start.you -> ME
                 isAlly(p.tm) -> BLUE
