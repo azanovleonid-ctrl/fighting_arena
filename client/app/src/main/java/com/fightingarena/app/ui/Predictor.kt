@@ -72,7 +72,7 @@ class Predictor(private val map: MapInfo) {
             seen = latest
             val ack = latest.me?.ack ?: -1
             while (pending.isNotEmpty() && pending.first().first <= ack) pending.removeFirst()
-            var p = server
+            var p: Offset = server
             for ((_, v) in pending) p = resolve(p + v * (speed * TICK_S), boxes)
             val old = tickPos
             if (old == null || (p - old).getDistance() > SNAP_DISTANCE) {
@@ -99,7 +99,7 @@ class Predictor(private val map: MapInfo) {
         }
         correction *= exp(-dt / SMOOTH_S)
         // Between ticks the brawler keeps walking with the stick as it is now, so it reacts at once.
-        val b = tickPos ?: server
+        val b: Offset = tickPos ?: server
         val raw = resolve(b + move * (speed * acc), boxes)
         // Turning or letting go mid-tick must not jump: the difference fades like a correction.
         if (move != lastMove) correction += resolve(b + lastMove * (speed * acc), boxes) - raw
