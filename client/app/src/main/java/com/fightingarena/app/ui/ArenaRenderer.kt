@@ -245,7 +245,8 @@ fun DrawScope.drawArena(
             val bear = p.b == "hammer"
             val bird = p.b == "spark"
             val shade = p.b == "shade"
-            if (bear || bird || shade) {
+            val boomer = p.b == "boomer"
+            if (bear || bird || shade || boomer) {
                 val walk = paints.walks.getOrPut(p.id) { WalkState(base.x, base.y) }
                 walk.advance(base, p.f)
                 if (bear) {
@@ -262,7 +263,15 @@ fun DrawScope.drawArena(
                         1f - (nowNanos - local.lastFireNanos) / 150_000_000f
                     } else if (cur.shots.any { it.o == p.id && (Offset(it.x, it.y) - base).getDistance() < 80f }) 1f else 0f
                     val timeS = (nowNanos % 60_000_000_000L) / 1e9f
-                    if (bird) drawFirebird(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), timeS)
+                    if (boomer) {
+                        // The boomerang leaves his hand while it flies; a throw plays from the wind-up on.
+                        val inAir = cur.shots.any { it.o == p.id && it.k == "boomerang" }
+                        val throwK = if (p.id == start.you) {
+                            0.25f + (nowNanos - local.lastFireNanos) / 450_000_000f
+                        } else if (inAir && cur.shots.any { it.o == p.id && (Offset(it.x, it.y) - base).getDistance() < 80f }) 0.4f else 1f
+                        val justThrew = p.id == start.you && nowNanos - local.lastFireNanos < 700_000_000L
+                        drawBoomer(pos, walk, side, alpha, throwK.coerceIn(0f, 1f), !inAir && !justThrew)
+                    } else if (bird) drawFirebird(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), timeS)
                     else drawShade(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), timeS)
                 }
                 if (p.sl) drawCircle(Color(0xFF81D4FA).copy(alpha = 0.4f), r + 6f, pos - Offset(0f, 20f))
@@ -279,7 +288,7 @@ fun DrawScope.drawArena(
                 drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
             }
 
-            val barTop = if (bear || bird || shade) pos.y - 84f else pos.y - r - 22f
+            val barTop = if (bear || bird || shade || boomer) pos.y - 84f else pos.y - r - 22f
             val hpColor = when {
                 p.id == start.you -> ME
                 isAlly(p.tm) -> BLUE
