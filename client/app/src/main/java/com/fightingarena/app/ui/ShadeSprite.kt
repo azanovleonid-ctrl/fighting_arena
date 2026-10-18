@@ -60,7 +60,7 @@ fun DrawScope.drawShade(pos: Offset, walk: WalkState, side: Color, alpha: Float,
         fun line(a: Offset, b: Offset, width: Float, color: Color) =
             drawLine(c(color), a, b, strokeWidth = width, cap = StrokeCap.Round)
 
-        fun shape(color: Color, vararg pts: Offset) {
+        fun shape(color: Color, pts: List<Offset>) {
             val path = Path().apply {
                 moveTo(pts[0].x, pts[0].y)
                 for (p in pts.drop(1)) lineTo(p.x, p.y)
@@ -83,7 +83,7 @@ fun DrawScope.drawShade(pos: Offset, walk: WalkState, side: Color, alpha: Float,
             val n = Offset(-d.y, d.x)
             line(hand - d * 5f, hand + d * 3f, 3.5f, HILT)
             line(hand + d * 3f + n * 5f, hand + d * 3f - n * 5f, 3f, HILT)
-            shape(BLADE, hand + d * 4f + n * 3f, hand + d * l, hand + d * 4f - n * 3f)
+            shape(BLADE, listOf(hand + d * 4f + n * 3f, hand + d * l, hand + d * 4f - n * 3f))
             line(hand + d * 6f + n, hand + d * (l - 4f), 1.2f, Color.White)
         }
 
@@ -91,12 +91,14 @@ fun DrawScope.drawShade(pos: Offset, walk: WalkState, side: Color, alpha: Float,
         val flap = 6f + 8f * m
         shape(
             CLOAK_DARK,
-            Offset(-8f, by - 16f),
-            Offset(-14f - flap, by + 4f + wave * 30f),
-            Offset(-18f - flap, by + 22f + wave * 20f),
-            Offset(-10f - flap * 0.5f, by + 18f),
-            Offset(-6f - flap * 0.4f, by + 26f),
-            Offset(2f, by + 16f),
+            listOf(
+                Offset(-8f, by - 16f),
+                Offset(-14f - flap, by + 4f + wave * 30f),
+                Offset(-18f - flap, by + 22f + wave * 20f),
+                Offset(-10f - flap * 0.5f, by + 18f),
+                Offset(-6f - flap * 0.4f, by + 26f),
+                Offset(2f, by + 16f),
+            ),
         )
 
         leg(-4f, -s * 8f * m, max(0f, -s) * 6f * m, CLOAK_DARK)
@@ -107,8 +109,8 @@ fun DrawScope.drawShade(pos: Offset, walk: WalkState, side: Color, alpha: Float,
 
         // Torso in a dark coat with a violet sash.
         drawRoundRect(c(CLOAK), Offset(-11f, by - 18f), Size(22f, 32f), CornerRadius(9f))
-        shape(SASH, Offset(-11f, by + 1f), Offset(11f, by - 3f), Offset(11f, by + 3f), Offset(-11f, by + 7f))
-        shape(SASH_DARK, Offset(-9f, by + 4f), Offset(-15f - wave * 20f, by + 15f), Offset(-12f - wave * 20f, by + 17f), Offset(-5f, by + 6f))
+        shape(SASH, listOf(Offset(-11f, by + 1f), Offset(11f, by - 3f), Offset(11f, by + 3f), Offset(-11f, by + 7f)))
+        shape(SASH_DARK, listOf(Offset(-9f, by + 4f), Offset(-15f - wave * 20f, by + 15f), Offset(-12f - wave * 20f, by + 17f), Offset(-5f, by + 6f)))
         leg(4f, s * 8f * m, max(0f, s) * 6f * m, CLOAK)
 
         // Hood peaks at the back; the face stays in deep shadow with two glowing eyes and a mask.
