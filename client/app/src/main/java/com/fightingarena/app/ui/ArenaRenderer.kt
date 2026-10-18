@@ -244,7 +244,8 @@ fun DrawScope.drawArena(
             }
             val bear = p.b == "hammer"
             val bird = p.b == "spark"
-            if (bear || bird) {
+            val shade = p.b == "shade"
+            if (bear || bird || shade) {
                 val walk = paints.walks.getOrPut(p.id) { WalkState(base.x, base.y) }
                 walk.advance(base, p.f)
                 if (bear) {
@@ -260,7 +261,9 @@ fun DrawScope.drawArena(
                     val recoil = if (p.id == start.you) {
                         1f - (nowNanos - local.lastFireNanos) / 150_000_000f
                     } else if (cur.shots.any { it.o == p.id && (Offset(it.x, it.y) - base).getDistance() < 80f }) 1f else 0f
-                    drawFirebird(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), (nowNanos % 60_000_000_000L) / 1e9f)
+                    val timeS = (nowNanos % 60_000_000_000L) / 1e9f
+                    if (bird) drawFirebird(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), timeS)
+                    else drawShade(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), timeS)
                 }
                 if (p.sl) drawCircle(Color(0xFF81D4FA).copy(alpha = 0.4f), r + 6f, pos - Offset(0f, 20f))
                 if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r + 24f, pos - Offset(0f, 20f), style = Stroke(5f))
@@ -276,7 +279,7 @@ fun DrawScope.drawArena(
                 drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
             }
 
-            val barTop = if (bear || bird) pos.y - 84f else pos.y - r - 22f
+            val barTop = if (bear || bird || shade) pos.y - 84f else pos.y - r - 22f
             val hpColor = when {
                 p.id == start.you -> ME
                 isAlly(p.tm) -> BLUE

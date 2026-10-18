@@ -161,12 +161,13 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
     ) {
         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(Modifier.size(28.dp)) {
-                if (b.id == "hammer" || b.id == "spark") {
+                if (b.id == "hammer" || b.id == "spark" || b.id == "shade") {
                     // The drawn hero, standing still, scaled to fit the card.
                     val k = size.minDimension / 100f
                     scale(k, k, pivot = center) {
                         if (b.id == "hammer") drawBear(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f)
-                        else drawFirebird(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f, 0f)
+                        else if (b.id == "spark") drawFirebird(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f, 0f)
+                        else drawShade(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f, 0f)
                     }
                 } else {
                     drawCircle(b.color)
