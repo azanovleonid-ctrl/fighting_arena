@@ -168,7 +168,7 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
                     val k = size.minDimension / 100f
                     scale(k, k, pivot = center) {
                         if (b.id == "hammer") drawHammerSprite(
-                            pos = center + Offset(0f, 22f),
+                            pos = center + Offset(0f, 30f),
                             sprites = requireNotNull(hammerSprites),
                             walk = WalkState(0f, 0f),
                             facing = PI.toFloat() / 2f,
@@ -177,7 +177,7 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
                             swing = 0f,
                             air = null,
                             nowNanos = 0L,
-                            spriteSize = 100f,
+                            spriteSize = 116f,
                             drawGround = false,
                         )
                         else if (b.id == "boomer") drawBoomer(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 1f, true)
