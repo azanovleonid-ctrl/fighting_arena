@@ -137,8 +137,8 @@ fun HomeScreen(
         if (friendDialog) {
             FriendDialog(
                 mode = settings.mode,
-                onCreate = { together -> friendDialog = false; onCreateParty(mode, together) },
-                onJoin = { code -> friendDialog = false; onJoinParty(mode, code) },
+                onCreate = { together -> friendDialog = false; onCreateParty(settings.mode, together) },
+                onJoin = { code -> friendDialog = false; onJoinParty(settings.mode, code) },
                 onDismiss = { friendDialog = false },
             )
         }
