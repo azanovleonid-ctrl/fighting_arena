@@ -155,7 +155,7 @@ fun DrawScope.drawArena(
                 drawRect((if (isAlly(team)) BLUE else RED).copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y0), Size(GOAL_HALF_WIDTH * 2, tile))
                 for (k in 1..3) {
                     val y = y0 + k * tile / 4
-                    drawLine(Color.White.copy(alpha = 0.5f), Offset(worldW / 2, y), Offset(worldW / 2 + GOAL_HALF_WIDTH, y), 2f)
+                    drawLine(Color.White.copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y), Offset(worldW / 2 + GOAL_HALF_WIDTH, y), 2f)
                 }
             }
             drawLine(Color.White.copy(alpha = 0.35f), Offset(6 * tile, worldH / 2), Offset(worldW - 6 * tile, worldH / 2), 4f)
