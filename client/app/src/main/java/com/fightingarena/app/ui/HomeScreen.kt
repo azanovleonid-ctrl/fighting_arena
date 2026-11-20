@@ -168,7 +168,7 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
                     val k = size.minDimension / 100f
                     scale(k, k, pivot = center) {
                         if (b.id == "hammer") drawHammerSprite(
-                            pos = center + Offset(0f, 22f),
+                            pos = center + Offset(0f, 30f),
                             sprites = requireNotNull(hammerSprites),
                             walk = WalkState(0f, 0f),
                             facing = PI.toFloat() / 2f,
@@ -177,7 +177,7 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
                             swing = 0f,
                             air = null,
                             nowNanos = 0L,
-                            spriteSize = 100f,
+                            spriteSize = 116f,
                             drawGround = false,
                         )
                         else if (b.id == "boomer") drawBoomer(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 1f, true)
@@ -210,7 +210,6 @@ private fun BrawlerDetails(b: BrawlerInfo) {
 @Composable
 private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Card(
-        onClick = onClick,
         modifier = modifier,
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
@@ -219,7 +218,7 @@ private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
             Text(m.name, fontWeight = FontWeight.Bold)
-            Text(m.about, style = MaterialTheme.typography.labelSmall)
+            Text(m.about, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
