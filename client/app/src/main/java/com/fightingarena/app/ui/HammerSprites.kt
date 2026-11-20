@@ -42,9 +42,19 @@ fun rememberHammerSprites(): HammerSprites {
     }
 }
 
-/* The text container lets the asset travel through text-only repository tools. */
+/* Text containers and numbered parts travel safely through text-only repository tools. */
 private fun Context.loadHammerSprite(name: String): ImageBitmap {
-    val encoded = assets.open(name).bufferedReader().use { it.readText() }
+    val parts = assets.list("")
+        ?.filter { it.startsWith("$name.part") }
+        ?.sorted()
+        .orEmpty()
+    val encoded = if (parts.isEmpty()) {
+        assets.open(name).bufferedReader().use { it.readText() }
+    } else {
+        parts.joinToString("") { part ->
+            assets.open(part).bufferedReader().use { it.readText() }
+        }
+    }
     val bytes = Base64.decode(encoded, Base64.DEFAULT)
     return requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
         "Не удалось декодировать спрайт $name"
