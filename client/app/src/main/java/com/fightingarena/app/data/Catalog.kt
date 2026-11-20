@@ -24,7 +24,7 @@ data class BrawlerInfo(
 )
 
 val BRAWLERS = listOf(
-    BrawlerInfo("hammer", "Кувалда", "Танк", 6000, 245, 150, "1500", "Удар молотом по дуге перед собой", "Прыжок с ударом при приземлении", Color(0xFF8D6E63), AimShape.ARC, AimShape.THROW, 520, 1600),
+    BrawlerInfo("hammer", "Кувалда", "Танк", 6000, 245, 150, "1500", "Удар секирой по дуге перед собой", "Прыжок с ударом при приземлении", Color(0xFF8D6E63), AimShape.ARC, AimShape.THROW, 520, 1600),
     BrawlerInfo("spark", "Искра", "Ближний бой", 4600, 235, 330, "5 × 330", "Дробовик: веер из 5 дробинок", "Рывок сквозь врагов", Color(0xFFFF7043), AimShape.FAN, AimShape.DASH, 405, 1500),
     BrawlerInfo("boomer", "Бумер", "Боец", 3900, 240, 520, "600 + 600", "Бумеранг: бьёт туда и обратно", "Три бумеранга веером", Color(0xFF66BB6A), AimShape.LINE, AimShape.FAN, 560, 1500),
     BrawlerInfo("tinker", "Винтик", "Инженер", 3600, 235, 520, "2 × 360", "Два болта параллельно", "Турель, которая стреляет сама", Color(0xFFFFCA28), AimShape.LINE, AimShape.SELF, 70, 1200),

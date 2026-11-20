@@ -53,6 +53,7 @@ import com.fightingarena.app.data.ModeInfo
 import com.fightingarena.app.data.Settings
 import com.fightingarena.app.data.brawler
 import kotlinx.coroutines.launch
+import kotlin.math.PI
 
 @Composable
 fun HomeScreen(
@@ -136,8 +137,8 @@ fun HomeScreen(
         if (friendDialog) {
             FriendDialog(
                 mode = settings.mode,
-                onCreate = { together -> friendDialog = false; onCreateParty(settings.mode, together) },
-                onJoin = { code -> friendDialog = false; onJoinParty(settings.mode, code) },
+                onCreate = { together -> friendDialog = false; onCreateParty(mode, together) },
+                onJoin = { code -> friendDialog = false; onJoinParty(mode, code) },
                 onDismiss = { friendDialog = false },
             )
         }
@@ -151,6 +152,7 @@ fun HomeScreen(
 
 @Composable
 private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val hammerSprites = if (b.id == "hammer") rememberHammerSprites() else null
     Card(
         onClick = onClick,
         modifier = modifier,
@@ -165,7 +167,19 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
                     // The drawn hero, standing still, scaled to fit the card.
                     val k = size.minDimension / 100f
                     scale(k, k, pivot = center) {
-                        if (b.id == "hammer") drawBear(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f)
+                        if (b.id == "hammer") drawHammerSprite(
+                            pos = center + Offset(0f, 22f),
+                            sprites = requireNotNull(hammerSprites),
+                            walk = WalkState(0f, 0f),
+                            facing = PI.toFloat() / 2f,
+                            side = b.color,
+                            alpha = 1f,
+                            swing = 0f,
+                            air = null,
+                            nowNanos = 0L,
+                            spriteSize = 100f,
+                            drawGround = false,
+                        )
                         else if (b.id == "boomer") drawBoomer(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 1f, true)
                         else if (b.id == "spark") drawFirebird(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f, 0f)
                         else drawShade(center + Offset(0f, 22f), WalkState(0f, 0f), b.color, 1f, 0f, 0f)
