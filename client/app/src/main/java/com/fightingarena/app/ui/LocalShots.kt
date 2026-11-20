@@ -104,6 +104,13 @@ class LocalShots(private val start: StartMsg) {
         return true
     }
 
+    /** The full sprite swing outlives the separate 300 ms slash arc. Zero is its first valid frame. */
+    fun hammerSwing(nowNanos: Long): Float? {
+        if (start.brawler != "hammer" || lastFireNanos == 0L) return null
+        return ((nowNanos - lastFireNanos) / HAMMER_ATTACK_NANOS.toFloat())
+            .takeIf { it >= 0f && it < 1f }
+    }
+
     private fun spawn(p: Pattern, pos: Offset, angle: Float, nowNanos: Long) {
         for (a in p.angles) {
             shots += LocalShot(pos.x, pos.y, cos(angle + a) * p.speed, sin(angle + a) * p.speed, p.range, nowNanos)

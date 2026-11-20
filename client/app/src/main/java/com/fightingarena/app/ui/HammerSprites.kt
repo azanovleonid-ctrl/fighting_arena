@@ -20,6 +20,7 @@ import kotlin.math.floor
 
 private const val HAMMER_FRAME = 64
 private const val HAMMER_DIRECTIONS = 8
+internal const val HAMMER_ATTACK_NANOS = 600_000_000L
 
 /** Directional sprite atlases rendered from the bear-warrior GLB model. */
 class HammerSprites(
@@ -78,6 +79,7 @@ fun DrawScope.drawHammerSprite(
     side: Color,
     alpha: Float,
     swing: Float,
+    attacking: Boolean = false,
     air: Float?,
     nowNanos: Long,
     spriteSize: Float = 112f,
@@ -101,7 +103,7 @@ fun DrawScope.drawHammerSprite(
     val row = hammerDirection(facing)
     val animation = when {
         air != null -> Triple(sprites.jump, 4, air.coerceIn(0f, 0.999f))
-        swing > 0f && swing < 1f -> Triple(sprites.attack, 6, swing)
+        attacking -> Triple(sprites.attack, 6, swing.coerceIn(0f, 0.999f))
         walk.moving > 0.25f -> Triple(
             sprites.run,
             4,
