@@ -137,8 +137,8 @@ fun HomeScreen(
         if (friendDialog) {
             FriendDialog(
                 mode = settings.mode,
-                onCreate = { together -> friendDialog = false; onCreateParty(mode, together) },
-                onJoin = { code -> friendDialog = false; onJoinParty(mode, code) },
+                onCreate = { together -> friendDialog = false; onCreateParty(settings.mode, together) },
+                onJoin = { code -> friendDialog = false; onJoinParty(settings.mode, code) },
                 onDismiss = { friendDialog = false },
             )
         }
@@ -223,7 +223,7 @@ private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick
     }
 }
 
-/** Play with a friend: open a room and share its code, or join a friend's room with its code. */
+/** Play with a friend: open a room and share its code, or join a friend's room by code. */
 @Composable
 private fun FriendDialog(mode: String, onCreate: (Boolean) -> Unit, onJoin: (String) -> Unit, onDismiss: () -> Unit) {
     var together by remember { mutableStateOf(mode != "survival") }
@@ -237,19 +237,19 @@ private fun FriendDialog(mode: String, onCreate: (Boolean) -> Unit, onJoin: (Str
                 if (mode == "survival") {
                     Text("В выживании каждый сам за себя, поэтому вы будете друг против друга.", style = MaterialTheme.typography.bodySmall)
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = together, onClick = { together = true }, label = { Text("Вместе") })
                         FilterChip(selected = !together, onClick = { together = false }, label = { Text("Друг против друга") })
                     }
                 }
                 Button(onClick = { onCreate(together) }, modifier = Modifier.fillMaxWidth()) { Text("Создать комнату") }
                 HorizontalDivider()
-                Text("Друг уже играет с вами? Введите код комнаты.", style = MaterialTheme.typography.bodySmall)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Друг уже создал комнату?", style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it.filter(Char::isDigit).take(4) },
-                        label = { Text("Код комнаты") },
+                        label = { Text("Код") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
