@@ -238,6 +238,6 @@ private fun ResultsView(end: EndMsg, onAgain: (() -> Unit)?, onExit: () -> Unit)
         }
         Spacer(Modifier.weight(1f))
         onAgain?.let { Button(onClick = it, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Ещё бой", style = MaterialTheme.typography.titleLarge) } }
-        OutlinedButton(onClick = onExit, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("В меню") }
+        OutlinedButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("В меню") }
     }
 }
