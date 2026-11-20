@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
 import com.fightingarena.app.arena.ArenaConnection
+import com.fightingarena.app.arena.EffectSnap
 import com.fightingarena.app.arena.PlayerSnap
 import com.fightingarena.app.arena.StartMsg
 import com.fightingarena.app.arena.StateMsg
@@ -52,6 +53,22 @@ private val SUPER_GUIDE = Color(0xFFFFCA28).copy(alpha = 0.45f)
 class ArenaPaints {
     /** Walk cycles of the bears on screen, by player id. */
     val walks = HashMap<Int, WalkState>()
+    private data class HammerAttack(val effectId: Int, val startedNanos: Long)
+    private val hammerAttacks = HashMap<Int, HammerAttack>()
+
+    /** Keeps a remote swing playing after its 400 ms network effect disappears. */
+    fun remoteHammerSwing(playerId: Int, effect: EffectSnap?, nowNanos: Long): Float? {
+        if (effect != null && hammerAttacks[playerId]?.effectId != effect.id) {
+            hammerAttacks[playerId] = HammerAttack(
+                effect.id,
+                nowNanos - effect.age * 1_000_000L,
+            )
+        }
+        val attack = hammerAttacks[playerId] ?: return null
+        return ((nowNanos - attack.startedNanos) / HAMMER_ATTACK_NANOS.toFloat())
+            .takeIf { it >= 0f && it < 1f }
+    }
+
     val name = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -252,10 +269,12 @@ fun DrawScope.drawArena(
                 walk.advance(base, p.f)
                 if (bear) {
                     val swing = if (p.id == start.you) {
-                        local.slashes.lastOrNull()?.let { (nowNanos - it.bornNanos) / 300_000_000f }
+                        local.hammerSwing(nowNanos)
                     } else {
-                        cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
-                            .minByOrNull { it.age }?.let { it.age / 300f }
+                        val slash = cur.fx
+                            .filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
+                            .minByOrNull { it.age }
+                        paints.remoteHammerSwing(p.id, slash, nowNanos)
                     }
                     drawHammerSprite(
                         pos = pos,
@@ -264,7 +283,8 @@ fun DrawScope.drawArena(
                         facing = p.f,
                         side = side,
                         alpha = alpha,
-                        swing = swing?.takeIf { it < 1f } ?: 0f,
+                        swing = swing ?: 0f,
+                        attacking = swing != null,
                         air = p.air,
                         nowNanos = nowNanos,
                     )
