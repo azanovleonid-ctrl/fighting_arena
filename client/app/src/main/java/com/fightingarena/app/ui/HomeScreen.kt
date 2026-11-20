@@ -210,6 +210,7 @@ private fun BrawlerDetails(b: BrawlerInfo) {
 @Composable
 private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Card(
+        onClick = onClick,
         modifier = modifier,
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
@@ -218,7 +219,7 @@ private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
             Text(m.name, fontWeight = FontWeight.Bold)
-            Text(m.about, style = MaterialTheme.typography.bodySmall)
+            Text(m.about, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
