@@ -74,6 +74,7 @@ fun DrawScope.drawArena(
     start: StartMsg,
     controls: TouchControls,
     paints: ArenaPaints,
+    sprites: HammerSprites,
     predicted: Offset?,
     local: LocalShots,
     netStats: String,
@@ -154,7 +155,7 @@ fun DrawScope.drawArena(
                 drawRect((if (isAlly(team)) BLUE else RED).copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y0), Size(GOAL_HALF_WIDTH * 2, tile))
                 for (k in 1..3) {
                     val y = y0 + k * tile / 4
-                    drawLine(Color.White.copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y), Offset(worldW / 2 + GOAL_HALF_WIDTH, y), 2f)
+                    drawLine(Color.White.copy(alpha = 0.5f), Offset(worldW / 2, y), Offset(worldW / 2 + GOAL_HALF_WIDTH, y), 2f)
                 }
             }
             drawLine(Color.White.copy(alpha = 0.35f), Offset(6 * tile, worldH / 2), Offset(worldW - 6 * tile, worldH / 2), 4f)
@@ -256,7 +257,17 @@ fun DrawScope.drawArena(
                         cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
                             .minByOrNull { it.age }?.let { it.age / 300f }
                     }
-                    drawBear(pos, walk, side, alpha, swing?.takeIf { it < 1f } ?: 0f)
+                    drawHammerSprite(
+                        pos = pos,
+                        sprites = sprites,
+                        walk = walk,
+                        facing = p.f,
+                        side = side,
+                        alpha = alpha,
+                        swing = swing?.takeIf { it < 1f } ?: 0f,
+                        air = p.air,
+                        nowNanos = nowNanos,
+                    )
                 } else {
                     // Recoil right after a shot: own shots from the phone, others' from fresh pellets nearby.
                     val recoil = if (p.id == start.you) {
@@ -288,7 +299,11 @@ fun DrawScope.drawArena(
                 drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
             }
 
-            val barTop = if (bear || bird || shade || boomer) pos.y - 84f else pos.y - r - 22f
+            val barTop = when {
+                bear -> pos.y - 106f
+                bird || shade || boomer -> pos.y - 84f
+                else -> pos.y - r - 22f
+            }
             val hpColor = when {
                 p.id == start.you -> ME
                 isAlly(p.tm) -> BLUE
