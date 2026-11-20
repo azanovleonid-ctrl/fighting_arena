@@ -74,6 +74,7 @@ fun DrawScope.drawArena(
     start: StartMsg,
     controls: TouchControls,
     paints: ArenaPaints,
+    sprites: HammerSprites,
     predicted: Offset?,
     local: LocalShots,
     netStats: String,
@@ -256,7 +257,17 @@ fun DrawScope.drawArena(
                         cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
                             .minByOrNull { it.age }?.let { it.age / 300f }
                     }
-                    drawBear(pos, walk, side, alpha, swing?.takeIf { it < 1f } ?: 0f)
+                    drawHammerSprite(
+                        pos = pos,
+                        sprites = sprites,
+                        walk = walk,
+                        facing = p.f,
+                        side = side,
+                        alpha = alpha,
+                        swing = swing?.takeIf { it < 1f } ?: 0f,
+                        air = p.air,
+                        nowNanos = nowNanos,
+                    )
                 } else {
                     // Recoil right after a shot: own shots from the phone, others' from fresh pellets nearby.
                     val recoil = if (p.id == start.you) {
@@ -288,7 +299,11 @@ fun DrawScope.drawArena(
                 drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
             }
 
-            val barTop = if (bear || bird || shade || boomer) pos.y - 84f else pos.y - r - 22f
+            val barTop = when {
+                bear -> pos.y - 106f
+                bird || shade || boomer -> pos.y - 84f
+                else -> pos.y - r - 22f
+            }
             val hpColor = when {
                 p.id == start.you -> ME
                 isAlly(p.tm) -> BLUE

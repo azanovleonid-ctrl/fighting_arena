@@ -130,6 +130,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
     val density = LocalDensity.current
     val controls = remember { TouchControls(with(density) { 64.dp.toPx() }, with(density) { 40.dp.toPx() }) }
     val paints = remember { ArenaPaints() }
+    val sprites = rememberHammerSprites()
     val predictor = remember(start) { Predictor(start.map) }
     val local = remember(start) { LocalShots(start) }
     controls.onRelease = { aim -> local.kickIfHolding(aim, conn, conn.latest) }
@@ -173,7 +174,7 @@ private fun ArenaView(conn: ArenaConnection, start: StartMsg, vibration: Boolean
             .pointerInput(conn) { handleTouches(controls, conn) },
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawArena(conn, start, controls, paints, predictor.pos, local, "${fps[0].toInt()} к/с · пинг ${conn.pingMs?.let { "$it мс (лучший ${conn.pingMinMs})" } ?: "—"}", frame)
+            drawArena(conn, start, controls, paints, sprites, predictor.pos, local, "${fps[0].toInt()} к/с · пинг ${conn.pingMs?.let { "$it мс (лучший ${conn.pingMinMs})" } ?: "—"}", frame)
         }
     }
 }
