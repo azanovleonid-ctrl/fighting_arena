@@ -137,14 +137,14 @@ fun HomeScreen(
         if (friendDialog) {
             FriendDialog(
                 mode = settings.mode,
-                onCreate = { together -> friendDialog = false; onCreateParty(settings.mode, together) },
-                onJoin = { code -> friendDialog = false; onJoinParty(settings.mode, code) },
+                onCreate = { together -> friendDialog = false; onCreateParty(mode, together) },
+                onJoin = { code -> friendDialog = false; onJoinParty(mode, code) },
                 onDismiss = { friendDialog = false },
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onClick = onHistory, modifier = Modifier.weight(1f)) { Text("История") }
-            OutlinedButton(onClick = onSettings, modifier = Modifier.weight(1f)) { Text("Настройки") }
+            OutlinedButton(onClick = onHistory) { Text("История") }
+            OutlinedButton(onClick = onSettings) { Text("Настройки") }
             TextButton(onClick = { scope.launch { app.session.signOut() } }) { Text("Выйти") }
         }
     }
@@ -174,7 +174,7 @@ private fun BrawlerCard(b: BrawlerInfo, selected: Boolean, modifier: Modifier, o
                             facing = PI.toFloat() / 2f,
                             side = b.color,
                             alpha = 1f,
-                            swing = 0f,
+                            swing = null,
                             air = null,
                             nowNanos = 0L,
                             spriteSize = 100f,
@@ -210,7 +210,6 @@ private fun BrawlerDetails(b: BrawlerInfo) {
 @Composable
 private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Card(
-        onClick = onClick,
         modifier = modifier,
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
@@ -219,12 +218,12 @@ private fun ModeCard(m: ModeInfo, selected: Boolean, modifier: Modifier, onClick
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
             Text(m.name, fontWeight = FontWeight.Bold)
-            Text(m.about, style = MaterialTheme.typography.labelSmall)
+            Text(m.about, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
-/** Play with a friend: open a room and share its code, or join a friend's room by code. */
+/** Play with a friend: open a room and share its code, or join a friend's room with its code. */
 @Composable
 private fun FriendDialog(mode: String, onCreate: (Boolean) -> Unit, onJoin: (String) -> Unit, onDismiss: () -> Unit) {
     var together by remember { mutableStateOf(mode != "survival") }
@@ -238,19 +237,19 @@ private fun FriendDialog(mode: String, onCreate: (Boolean) -> Unit, onJoin: (Str
                 if (mode == "survival") {
                     Text("В выживании каждый сам за себя, поэтому вы будете друг против друга.", style = MaterialTheme.typography.bodySmall)
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         FilterChip(selected = together, onClick = { together = true }, label = { Text("Вместе") })
                         FilterChip(selected = !together, onClick = { together = false }, label = { Text("Друг против друга") })
                     }
                 }
                 Button(onClick = { onCreate(together) }, modifier = Modifier.fillMaxWidth()) { Text("Создать комнату") }
                 HorizontalDivider()
-                Text("Друг уже создал комнату?", style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Друг уже играет с вами? Введите код комнаты.", style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it.filter(Char::isDigit).take(4) },
-                        label = { Text("Код") },
+                        label = { Text("Код комнаты") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),

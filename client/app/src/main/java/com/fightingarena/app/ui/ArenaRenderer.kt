@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
 import com.fightingarena.app.arena.ArenaConnection
+import com.fightingarena.app.arena.EffectSnap
 import com.fightingarena.app.arena.PlayerSnap
 import com.fightingarena.app.arena.StartMsg
 import com.fightingarena.app.arena.StateMsg
@@ -52,6 +53,22 @@ private val SUPER_GUIDE = Color(0xFFFFCA28).copy(alpha = 0.45f)
 class ArenaPaints {
     /** Walk cycles of the bears on screen, by player id. */
     val walks = HashMap<Int, WalkState>()
+    private data class HammerAttack(val effectId: Int, val startedNanos: Long)
+    private val hammerAttacks = HashMap<Int, HammerAttack>()
+
+    /** Keeps a remote swing playing after its 400 ms network effect disappears. */
+    fun remoteHammerSwing(playerId: Int, effect: EffectSnap?, nowNanos: Long): Float? {
+        if (effect != null && hammerAttacks[playerId]?.effectId != effect.id) {
+            hammerAttacks[playerId] = HammerAttack(
+                effect.id,
+                nowNanos - effect.age * 1_000_000L,
+            )
+        }
+        val attack = hammerAttacks[playerId] ?: return null
+        return ((nowNanos - attack.startedNanos) / HAMMER_ATTACK_NANOS.toFloat())
+            .takeIf { it >= 0f && it < 1f }
+    }
+
     val name = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -146,7 +163,7 @@ fun DrawScope.drawArena(
             drawRoundRect(lerpColor(BOX_EDGE, BOX, hp / BOX_HP), o, s, CornerRadius(6f))
             drawRoundRect(BOX_EDGE, o, s, CornerRadius(6f), style = Stroke(4f))
             drawLine(BOX_EDGE, o, o + Offset(s.width, s.height), 3f)
-            drawLine(BOX_EDGE, o + Offset(s.width, 0f), o + Offset(0f, s.height), 3f)
+            drawLine(BOX_EDGE, o + Offset(s.width, 0f), o, 3f)
         }
 
         if (start.mode == "ball") {
@@ -155,7 +172,7 @@ fun DrawScope.drawArena(
                 drawRect((if (isAlly(team)) BLUE else RED).copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y0), Size(GOAL_HALF_WIDTH * 2, tile))
                 for (k in 1..3) {
                     val y = y0 + k * tile / 4
-                    drawLine(Color.White.copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y), Offset(worldW / 2 + GOAL_HALF_WIDTH, y), 2f)
+                    drawLine(Color.White.copy(alpha = 0.5f), Offset(worldW / 2 - GOAL_HALF_WIDTH, y), Size(GOAL_HALF_WIDTH * 2, 2f))
                 }
             }
             drawLine(Color.White.copy(alpha = 0.35f), Offset(6 * tile, worldH / 2), Offset(worldW - 6 * tile, worldH / 2), 4f)
@@ -178,14 +195,14 @@ fun DrawScope.drawArena(
         for (z in cur.zones) {
             val color = if (isAlly(z.tm) || z.tm == me?.tm) Color(0xFF81D4FA) else Color(0xFFB3E5FC)
             drawCircle(color.copy(alpha = 0.35f), z.r, Offset(z.x, z.y))
-            drawCircle(Color.White.copy(alpha = 0.7f), z.r, Offset(z.x, z.y), style = Stroke(3f))
+            drawCircle(color.copy(alpha = 0.7f), z.r, Offset(z.x, z.y), style = Stroke(3f))
         }
 
         for (c in cur.cubes) {
             val o = Offset(c.x - 14f, c.y - 14f)
-            drawRoundRect(Color.Black.copy(alpha = 0.3f), o + Offset(0f, 4f), Size(28f, 28f), CornerRadius(5f))
-            drawRoundRect(CUBE, o, Size(28f, 28f), CornerRadius(5f))
-            drawRoundRect(Color(0xFF33691E), o, Size(28f, 28f), CornerRadius(5f), style = Stroke(3f))
+            drawRoundRect(Color.Black.copy(alpha = 0.3f), o + Offset(0f, 4f), Size(28f, 28f))
+            drawRoundRect(CUBE, o, Size(28f, 28f))
+            drawRoundRect(Color(0xFF33691E), o, Size(28f, 28f), style = Stroke(3f))
         }
 
         if (me != null && me.alive) drawAimGuides(controls, cur, start, mine, mePos)
@@ -201,7 +218,7 @@ fun DrawScope.drawArena(
                     drawCircle(color.copy(alpha = 0.25f), s.br ?: 80f, target)
                     drawCircle(color.copy(alpha = 0.6f), s.br ?: 80f, target, style = Stroke(3f))
                     val lift = sin(PI.toFloat() * (s.z ?: 0f)) * 90f
-                    drawCircle(Color.Black.copy(alpha = 0.3f), 12f, pos)
+                    drawCircle(Color.Black.copy(alpha = 0.3f), 12f, pos + Offset(0f, 4f))
                     drawCircle(Color(0xFF37474F), 14f, pos - Offset(0f, lift))
                     drawCircle(color, 6f, pos - Offset(0f, lift + 10f))
                 }
@@ -224,8 +241,8 @@ fun DrawScope.drawArena(
         for (u in cur.turrets) {
             val pos = Offset(u.x, u.y)
             val color = sideColor(u.tm, if (u.o == start.you) start.you else -1)
-            drawRoundRect(Color.Black.copy(alpha = 0.3f), pos - Offset(22f, 18f), Size(44f, 44f), CornerRadius(8f))
-            drawRoundRect(Color(0xFF546E7A), pos - Offset(22f, 22f), Size(44f, 44f), CornerRadius(8f))
+            drawRoundRect(Color.Black.copy(alpha = 0.3f), pos - Offset(22f, 18f), Size(44f, 44f))
+            drawRoundRect(Color(0xFF546E7A), pos - Offset(22f, 22f), Size(44f, 44f))
             drawCircle(color, 12f, pos)
             drawHpBar(pos, 30f, u.hp.toFloat() / u.maxHp, color, 56f)
         }
@@ -252,10 +269,12 @@ fun DrawScope.drawArena(
                 walk.advance(base, p.f)
                 if (bear) {
                     val swing = if (p.id == start.you) {
-                        local.slashes.lastOrNull()?.let { (nowNanos - it.bornNanos) / 300_000_000f }
+                        local.hammerSwing(nowNanos)
                     } else {
-                        cur.fx.filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
-                            .minByOrNull { it.age }?.let { it.age / 300f }
+                        val slash = cur.fx
+                            .filter { it.k == "slash" && (Offset(it.x, it.y) - base).getDistance() < 90f }
+                            .minByOrNull { it.age }
+                        paints.remoteHammerSwing(p.id, slash, nowNanos)
                     }
                     drawHammerSprite(
                         pos = pos,
@@ -264,7 +283,7 @@ fun DrawScope.drawArena(
                         facing = p.f,
                         side = side,
                         alpha = alpha,
-                        swing = swing?.takeIf { it < 1f } ?: 0f,
+                        swing = swing,
                         air = p.air,
                         nowNanos = nowNanos,
                     )
@@ -279,7 +298,7 @@ fun DrawScope.drawArena(
                         val inAir = cur.shots.any { it.o == p.id && it.k == "boomerang" }
                         val throwK = if (p.id == start.you) {
                             0.25f + (nowNanos - local.lastFireNanos) / 450_000_000f
-                        } else if (inAir && cur.shots.any { it.o == p.id && (Offset(it.x, it.y) - base).getDistance() < 80f }) 0.4f else 1f
+                        } else if (inAir && cur.shots.any { it.o == p.id && it.k == "boomerang" }) 0.4f else 1f
                         val justThrew = p.id == start.you && nowNanos - local.lastFireNanos < 700_000_000L
                         drawBoomer(pos, walk, side, alpha, throwK.coerceIn(0f, 1f), !inAir && !justThrew)
                     } else if (bird) drawFirebird(pos, walk, side, alpha, recoil.coerceIn(0f, 1f), timeS)
@@ -294,7 +313,7 @@ fun DrawScope.drawArena(
                 drawCircle(side.copy(alpha = alpha), r, pos, style = Stroke(5f))
                 val face = dir(p.f)
                 drawLine(Color(0xFF263238).copy(alpha = alpha), pos + face * (r * 0.5f), pos + face * (r + 14f), strokeWidth = 10f)
-                if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r + 10f, pos, style = Stroke(5f))
+                if (p.sh) drawCircle(Color(0xFFFFF59D).copy(alpha = 0.6f), r, pos, style = Stroke(5f))
                 paints.name.textSize = 22f
                 drawContext.canvas.nativeCanvas.drawText(info.name.take(1), pos.x, pos.y + 8f, paints.name)
             }
@@ -359,17 +378,17 @@ fun DrawScope.drawArena(
             if (map.tileAt(c, r) != 'b') continue
             val tc = Offset(c * tile + tile / 2, r * tile + tile / 2)
             val near = (tc - mePos).getDistance() < tile * 1.6f
-            drawRoundRect(BUSH.copy(alpha = if (near) 0.45f else 0.95f), Offset(c * tile - 2, r * tile - 2), Size(tile + 4, tile + 4), CornerRadius(18f))
+            drawRoundRect(BUSH.copy(alpha = if (near) 0.45f else 0.95f), Offset(c * tile, r * tile), Size(tile, tile), CornerRadius(18f))
         }
 
         cur.gas?.let { radius ->
             val gas = Path().apply {
                 fillType = PathFillType.EvenOdd
-                addRect(Rect(0f, 0f, worldW, worldH))
-                addOval(Rect(Offset(worldW / 2, worldH / 2), radius))
+                addRect(Rect(Offset.Zero, Size(worldW, worldH)))
+                addOval(Rect(Offset(worldW / 2, worldH / 2) - Offset(radius, radius), Size(radius * 2, radius * 2)))
             }
             drawPath(gas, GAS.copy(alpha = 0.4f))
-            drawCircle(GAS, radius, Offset(worldW / 2, worldH / 2), style = Stroke(6f))
+            drawCircle(GAS, radius, Offset(worldW / 2, worldH / 2), style = Stroke(3f))
         }
     }
 
@@ -386,8 +405,8 @@ private fun lerpColor(a: Color, b: Color, k: Float): Color {
 
 private fun DrawScope.drawHpBar(at: Offset, width: Float, share: Float, color: Color, offsetY: Float) {
     val top = at.y - offsetY
-    drawRoundRect(Color.Black.copy(alpha = 0.6f), Offset(at.x - width / 2 - 2, top - 2), Size(width + 4, 12f), CornerRadius(4f))
-    drawRoundRect(color, Offset(at.x - width / 2, top), Size(width * share.coerceIn(0f, 1f), 8f), CornerRadius(3f))
+    drawRoundRect(Color.Black.copy(alpha = 0.6f), Offset(at.x - width / 2 - 2, top - 2), Size(width + 4, 12f))
+    drawRoundRect(color, Offset(at.x - width / 2, top), Size(width * share.coerceIn(0f, 1f), 8f))
 }
 
 /** Translucent hints on the ground while aiming: line, fan, arc or landing circle. */
@@ -418,13 +437,13 @@ private fun DrawScope.drawAimGuides(controls: TouchControls, cur: StateMsg, star
         val a = atan2(sup.y, sup.x)
         val range = b.superRange.toFloat()
         when (b.superAim) {
-            AimShape.THROW -> throwGuide(from, a, (sup.getDistance() * range).coerceAtLeast(70f), if (b.id == "hammer") 130f else 150f, SUPER_GUIDE)
+            AimShape.THROW -> throwGuide(from, a, (sup.getDistance() * b.range).coerceAtLeast(70f), if (b.id == "hammer") 130f else 150f, SUPER_GUIDE)
             AimShape.FAN -> {
                 val spread = if (b.id == "boomer") 0.3f else 0.24f
-                for (k in -1..1) ray(from, a + k * spread, range, SUPER_GUIDE)
+                for (k in -1..1) ray(from, a + k * spread, range.toFloat(), SUPER_GUIDE)
             }
             AimShape.SELF -> drawCircle(SUPER_GUIDE, 40f, from + dir(a) * range)
-            else -> ray(from, a, range, SUPER_GUIDE)
+            else -> ray(from, a, range.toFloat(), SUPER_GUIDE)
         }
     }
 }
@@ -432,7 +451,7 @@ private fun DrawScope.drawAimGuides(controls: TouchControls, cur: StateMsg, star
 private fun DrawScope.ray(from: Offset, a: Float, range: Float, color: Color) =
     drawLine(color, from, from + dir(a) * range, strokeWidth = 12f)
 
-private fun DrawScope.throwGuide(from: Offset, a: Float, dist: Float, radius: Float, color: Color) {
+private fun DrawScope.throwGuide(from: Offset, a: Float, dist: Float, radius: Float) {
     val at = from + dir(a) * dist
     drawLine(color, from, at, strokeWidth = 4f)
     drawCircle(color, radius, at)
@@ -471,11 +490,12 @@ private fun DrawScope.drawHud(me: PlayerSnap?, cur: StateMsg, controls: TouchCon
         val h = 9f * unit
         val y = 36f * unit
         listOf(b.p[my] to BLUE, b.p[1 - my] to RED).forEachIndexed { i, (share, color) ->
-            val x = if (i == 0) size.width / 2 - w - 8f * unit else size.width / 2 + 8f * unit
-            drawRoundRect(Color.Black.copy(alpha = 0.5f), Offset(x, y), Size(w, h), CornerRadius(4f))
-            drawRoundRect(color, Offset(x, y), Size(w * share, h), CornerRadius(4f))
+            val x = if (i == 0) size.width / 2 - w / 2 else size.width / 2 + w / 2
+            drawRoundRect(Color.Black.copy(alpha = 0.6f), Offset(x - w / 2, y), Size(w, h), CornerRadius(4f))
+            drawRoundRect(color, Offset(x - w / 2, y), Size(w * share, h), CornerRadius(4f))
         }
         paints.hud.textSize = 12f * unit
+        paints.hud.color = white
         canvas.drawText("${(b.p[my] * 100).toInt()}% : ${(b.p[1 - my] * 100).toInt()}%", size.width / 2, 60f * unit, paints.hud)
     }
 
@@ -487,16 +507,14 @@ private fun DrawScope.drawHud(me: PlayerSnap?, cur: StateMsg, controls: TouchCon
     cur.goal?.let { g ->
         paints.hud.textAlign = Paint.Align.CENTER
         paints.hud.textSize = 40f * unit
-        paints.hud.color = (if (g.team == start.team) BLUE else RED).toArgb()
         canvas.drawText("ГОЛ!", size.width / 2, size.height * 0.4f, paints.hud)
-        paints.hud.color = white
         paints.hud.textSize = 16f * unit
         if (g.scorer.isNotEmpty()) canvas.drawText(g.scorer, size.width / 2, size.height * 0.4f + 26f * unit, paints.hud)
     }
     if (cur.pause > 0 && cur.goal == null) {
         paints.hud.textAlign = Paint.Align.CENTER
         paints.hud.textSize = 30f * unit
-        canvas.drawText("Приготовьтесь!", size.width / 2, size.height * 0.4f, paints.hud)
+        canvas.drawText("Приготовьтесь!", size.width / 2, size.height * 0.5f, paints.hud)
     }
 
     paints.hud.textAlign = Paint.Align.RIGHT
@@ -520,7 +538,7 @@ private fun DrawScope.drawHud(me: PlayerSnap?, cur: StateMsg, controls: TouchCon
         -90f, 360f * sup, useCenter = false,
         topLeft = center - Offset(r, r), size = Size(r * 2, r * 2), style = Stroke(6f),
     )
-    if (sup >= 1f && !blocked) drawCircle(Color(0xFFFFCA28).copy(alpha = 0.8f), r * 0.75f, center)
+    if (sup >= 1f && !blocked) drawCircle(Color(0xFFFFCA28), r * 0.75f, center)
     controls.superStick?.let { drawStick(it, controls.stickRadius, Color(0xFFFFCA28)) }
     paints.hud.textAlign = Paint.Align.CENTER
     paints.hud.textSize = 11f * unit
@@ -536,10 +554,10 @@ private fun DrawScope.drawHud(me: PlayerSnap?, cur: StateMsg, controls: TouchCon
 
 private fun DrawScope.drawStick(stick: Stick, radius: Float, color: Color) {
     drawCircle(Color.Black.copy(alpha = 0.25f), radius, stick.origin)
-    drawCircle(color.copy(alpha = 0.35f), radius, stick.origin, style = Stroke(4f))
+    drawCircle(Color.Black.copy(alpha = 0.35f), radius, stick.origin, style = Stroke(4f))
     val d = stick.pos - stick.origin
     val len = d.getDistance()
-    val knob = if (len > radius) stick.origin + d * (radius / len) else stick.pos
+    val knob = if (len > radius) stick.origin + Offset(0f, 0f) else stick.pos
     drawCircle(color.copy(alpha = 0.7f), radius * 0.4f, knob)
 }
 
@@ -557,7 +575,7 @@ private fun DrawScope.drawLocalShots(local: LocalShots, nowNanos: Long) {
         drawCircle(mine.copy(alpha = 0.25f), 85f, b.to)
         drawCircle(mine.copy(alpha = 0.6f), 85f, b.to, style = Stroke(3f))
         val lift = sin(PI.toFloat() * k) * 90f
-        drawCircle(Color.Black.copy(alpha = 0.3f), 12f, pos)
+        drawCircle(Color.Black.copy(alpha = 0.3f), 12f, pos + Offset(0f, 4f))
         drawCircle(Color(0xFF37474F), 14f, pos - Offset(0f, lift))
     }
     for (sl in local.slashes) {
